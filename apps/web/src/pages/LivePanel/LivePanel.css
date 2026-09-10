@@ -1,77 +1,61 @@
-:root {
-  color-scheme: dark;
-  --bg: #0b1220;
-  --panel: #121a2b;
-  --line: #243049;
-  --text: #e8eefc;
-  --muted: #93a0b8;
-  --accent: #2b6cb0;
-  --ok: #2f9e44;
-  --bad: #c92a2a;
-  --warn: #e67700;
-  --idle: #adb5bd;
-  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
+.live-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 28px 20px 48px;
   min-height: 100vh;
   background:
     radial-gradient(1200px 500px at 10% -10%, #16345f55, transparent),
     radial-gradient(900px 400px at 90% 0%, #0f513255, transparent),
     var(--bg);
-  color: var(--text);
 }
 
-.page {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 28px 20px 48px;
-}
-
-.top {
+.live-top {
   display: flex;
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
 }
 
-.brand {
+.live-brand {
   font-size: 13px;
   letter-spacing: 0.18em;
-  color: #7db7ff;
+  color: var(--accent-soft);
   font-weight: 700;
 }
 
-h1 {
+.live-page h1 {
   margin: 4px 0 6px;
   font-size: 28px;
   font-weight: 650;
 }
 
-.sub,
-.meta,
-.ts {
+.live-sub,
+.live-meta,
+.live-ts {
   color: var(--muted);
   margin: 0;
 }
 
-.meta {
+.live-meta {
   margin-top: 10px;
   font-size: 13px;
 }
 
-.badges {
+.live-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.live-badges {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
-.badge {
+.live-badge {
   border: 1px solid var(--line);
   background: #0e1626;
   border-radius: 999px;
@@ -81,17 +65,44 @@ h1 {
   letter-spacing: 0.04em;
 }
 
-.badge.ok {
+.live-badge.ok {
   border-color: #2b8a3e66;
   color: #8ce99a;
 }
 
-.badge.bad {
+.live-badge.bad {
   border-color: #c92a2a66;
   color: #ffa8a8;
 }
 
-.empty {
+.live-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.live-user em {
+  font-style: normal;
+  color: var(--accent-soft);
+  margin-left: 4px;
+}
+
+.live-logout {
+  border: 1px solid var(--line);
+  background: #0e1626;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.live-logout:hover {
+  border-color: var(--accent);
+}
+
+.live-empty {
   margin-top: 28px;
   padding: 24px;
   border: 1px dashed var(--line);
@@ -100,21 +111,21 @@ h1 {
   color: var(--muted);
 }
 
-.grid {
+.live-grid {
   margin-top: 22px;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 14px;
 }
 
-.card {
-  background: linear-gradient(180deg, #152038, var(--panel));
+.live-card {
+  background: linear-gradient(180deg, #152038, var(--bg-elevated));
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 16px;
 }
 
-.card-head {
+.live-card-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -122,12 +133,12 @@ h1 {
   margin-bottom: 14px;
 }
 
-.card-head h2 {
+.live-card-head h2 {
   margin: 0;
   font-size: 18px;
 }
 
-.status {
+.live-status {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -136,32 +147,32 @@ h1 {
   border: 1px solid var(--line);
 }
 
-.status-running {
+.live-status-running {
   color: #74c0fc;
   border-color: #1c7ed655;
   background: #1c7ed622;
 }
 
-.status-fault {
+.live-status-fault {
   color: #ff8787;
   border-color: #c92a2a66;
   background: #c92a2a22;
 }
 
-.status-idle {
+.live-status-idle {
   color: var(--idle);
 }
 
-.status-offline {
+.live-status-offline {
   color: #868e96;
 }
 
-.metrics {
+.live-metrics {
   display: grid;
   gap: 10px;
 }
 
-.metric {
+.live-metric {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
@@ -171,26 +182,22 @@ h1 {
   border: 1px solid #1d2a42;
 }
 
-.metric.hot .value {
+.live-metric.hot .live-value {
   color: #ff6b6b;
 }
 
-.label {
+.live-label {
   color: var(--muted);
   font-size: 12px;
 }
 
-.value {
+.live-value {
   font-variant-numeric: tabular-nums;
   font-size: 18px;
   font-weight: 650;
 }
 
-.ts {
+.live-ts {
   margin-top: 12px;
   font-size: 12px;
-}
-
-code {
-  color: #a5d8ff;
 }

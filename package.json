@@ -1,0 +1,33 @@
+{
+  "name": "industrial-monitoring-center",
+  "version": "0.1.0",
+  "private": true,
+  "description": "IMC · 单车间工业监控数字孪生（采集 → 存储 → 推送 → 3D/告警）",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev -w @imc/web",
+    "dev:api": "npm run dev -w @imc/api",
+    "dev:realtime": "npm run dev -w @imc/realtime",
+    "dev:ingest": "npm run dev -w @imc/ingest",
+    "dev:simulator": "npm run dev -w @imc/simulator",
+    "dev:live": "concurrently -k -n realtime,simulator,web -c cyan,magenta,green \"npm run dev:realtime\" \"npm run dev:simulator\" \"npm run dev:web\"",
+    "build": "npm run build -w @imc/shared-types && npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "docker:up": "docker compose -f deploy/docker-compose.yml --env-file .env up -d",
+    "docker:down": "docker compose -f deploy/docker-compose.yml --env-file .env down",
+    "docker:logs": "docker compose -f deploy/docker-compose.yml --env-file .env logs -f",
+    "docker:ps": "docker compose -f deploy/docker-compose.yml --env-file .env ps"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "npm@10"
+}

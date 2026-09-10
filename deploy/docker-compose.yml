@@ -1,0 +1,173 @@
+# IMC · Docker Compose 空壳（Year 1）
+# 用法：
+#   cp .env.example .env
+#   docker compose -f deploy/docker-compose.yml --env-file .env up -d
+#
+# 当前状态：基础设施可起；业务镜像为占位（应用代码未初始化）
+
+name: imc
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: imc-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-imc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-imc_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-imc}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - imc_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-imc} -d ${POSTGRES_DB:-imc}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # 可选：后续切换为 TimescaleDB 做时序；现阶段先用独立实例占位
+  timescale:
+    image: timescale/timescaledb:latest-pg16
+    container_name: imc-timescale
+    restart: unless-stopped
+    profiles: ["timeseries"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-imc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-imc_dev_password}
+      POSTGRES_DB: imc_ts
+    ports:
+      - "${TIMESCALE_PORT:-5433}:5432"
+    volumes:
+      - imc_ts_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-imc} -d imc_ts"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: imc-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - imc_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: imc-mosquitto
+    restart: unless-stopped
+    ports:
+      - "${MQTT_PORT:-1883}:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - imc_mqtt_data:/mosquitto/data
+      - imc_mqtt_log:/mosquitto/log
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 -i healthcheck -W 3 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ---- 业务服务（占位镜像，应用代码落地后替换 Dockerfile）----
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    container_name: imc-api
+    restart: unless-stopped
+    profiles: ["apps"]
+    env_file:
+      - ../.env
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgres://${POSTGRES_USER:-imc}:${POSTGRES_PASSWORD:-imc_dev_password}@postgres:5432/${POSTGRES_DB:-imc}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+    ports:
+      - "${API_PORT:-3001}:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  realtime:
+    build:
+      context: ..
+      dockerfile: apps/realtime/Dockerfile
+    container_name: imc-realtime
+    restart: unless-stopped
+    profiles: ["apps"]
+    env_file:
+      - ../.env
+    environment:
+      PORT: 3002
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+    ports:
+      - "${REALTIME_PORT:-3002}:3002"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  ingest:
+    build:
+      context: ..
+      dockerfile: apps/ingest/Dockerfile
+    container_name: imc-ingest
+    restart: unless-stopped
+    profiles: ["apps"]
+    env_file:
+      - ../.env
+    environment:
+      MQTT_URL: ${MQTT_URL:-mqtt://mosquitto:1883}
+    depends_on:
+      mosquitto:
+        condition: service_started
+
+  simulator:
+    build:
+      context: ..
+      dockerfile: apps/simulator/Dockerfile
+    container_name: imc-simulator
+    restart: unless-stopped
+    profiles: ["apps"]
+    env_file:
+      - ../.env
+    environment:
+      MQTT_URL: ${MQTT_URL:-mqtt://mosquitto:1883}
+      ASSET_ID: Machine001
+    depends_on:
+      mosquitto:
+        condition: service_started
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    container_name: imc-web
+    restart: unless-stopped
+    profiles: ["apps"]
+    environment:
+      VITE_API_URL: http://localhost:${API_PORT:-3001}
+      VITE_WS_URL: ws://localhost:${REALTIME_PORT:-3002}
+    ports:
+      - "${WEB_PORT:-3000}:80"
+    depends_on:
+      - api
+      - realtime
+
+volumes:
+  imc_pg_data:
+  imc_ts_data:
+  imc_redis_data:
+  imc_mqtt_data:
+  imc_mqtt_log:

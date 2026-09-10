@@ -1,0 +1,16 @@
+{
+  "name": "@imc/ingest",
+  "version": "0.1.0",
+  "private": true,
+  "description": "IMC MQTT/OPC 接入网关",
+  "scripts": {
+    "dev": "echo \"[imc-ingest] scaffold only\" && exit 0",
+    "build": "echo \"[imc-ingest] scaffold only\" && exit 0",
+    "lint": "echo \"[imc-ingest] lint placeholder\" && exit 0",
+    "typecheck": "echo \"[imc-ingest] typecheck placeholder\" && exit 0",
+    "test": "echo \"[imc-ingest] no tests yet\" && exit 0"
+  },
+  "dependencies": {
+    "@imc/shared-types": "0.1.0"
+  }
+}

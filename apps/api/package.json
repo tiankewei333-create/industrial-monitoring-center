@@ -1,0 +1,16 @@
+{
+  "name": "@imc/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "IMC 业务 API（台账 / 告警 / 权限）",
+  "scripts": {
+    "dev": "echo \"[imc-api] scaffold only — NestJS/FastAPI not initialized yet\" && exit 0",
+    "build": "echo \"[imc-api] scaffold only\" && exit 0",
+    "lint": "echo \"[imc-api] lint placeholder\" && exit 0",
+    "typecheck": "echo \"[imc-api] typecheck placeholder\" && exit 0",
+    "test": "echo \"[imc-api] no tests yet\" && exit 0"
+  },
+  "dependencies": {
+    "@imc/shared-types": "0.1.0"
+  }
+}

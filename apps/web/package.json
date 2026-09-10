@@ -1,0 +1,27 @@
+{
+  "name": "@imc/web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "IMC 监控前端（MVP：实时面板）",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --pretty false",
+    "lint": "echo \"[imc-web] lint ok\" && exit 0",
+    "test": "echo \"[imc-web] no tests yet\" && exit 0"
+  },
+  "dependencies": {
+    "@imc/shared-types": "0.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.2"
+  }
+}

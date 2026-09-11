@@ -1,9 +1,9 @@
 # @imc/ingest
 
-MVP 阶段由 `@imc/realtime` 直接订阅 MQTT。
+MVP: MQTT subscribe lives in `@imc/realtime`.
 
-本包后续承接：
+This package will later own:
 
-- 多 Broker / OPC-UA 网关
-- Payload 清洗与标准化
-- 写入时序库后再通知 realtime
+- Multi-broker / OPC-UA gateway
+- Payload cleaning and normalization
+- Timeseries write then notify realtime

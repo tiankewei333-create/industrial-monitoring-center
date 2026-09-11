@@ -3,7 +3,35 @@ import net from "node:net";
 import { WebSocketServer, type WebSocket } from "ws";
 import aedes from "aedes";
 import mqtt from "mqtt";
-import { MQTT_TOPICS, type TelemetryPayload } from "@imc/shared-types";
+import {
+  MQTT_TOPICS,
+  type TelemetryPayload,
+  type WsClientMessage,
+  type WsServerMessage,
+} from "@imc/shared-types";
+import {
+  acknowledgeAlarm,
+  evaluateTelemetry,
+  getAlarm,
+  hydrateAlarms,
+  listAlarms,
+  openAlarmCount,
+} from "./alarms.js";
+import {
+  initDb,
+  loadAlarmsFromDb,
+  touchAssetStatus,
+  upsertAlarm,
+  dbEnabled,
+} from "./db.js";
+import {
+  appendHistory,
+  getHistory,
+  historyMaxPoints,
+  historyPointCount,
+  listHistorySeries,
+} from "./history.js";
+import { enqueueTelemetry, initTimescale, timescaleEnabled } from "./timescale.js";
 
 const PORT = Number(process.env.PORT ?? process.env.REALTIME_PORT ?? 3002);
 const EMBED_MQTT = (process.env.IMC_EMBED_MQTT ?? "true").toLowerCase() !== "false";
@@ -15,12 +43,6 @@ const TELEMETRY_TOPIC = process.env.MQTT_TOPIC_TELEMETRY ?? `${MQTT_TOPICS.telem
 /** latest payload per asset — sent to new WS clients on connect */
 const latestByAsset = new Map<string, TelemetryPayload>();
 const sockets = new Set<WebSocket>();
-
-type WsMessage =
-  | { type: "hello"; service: string; mqttUrl: string; embeddedMqtt: boolean }
-  | { type: "snapshot"; assets: TelemetryPayload[] }
-  | { type: "telemetry"; data: TelemetryPayload }
-  | { type: "status"; mqttConnected: boolean };
 
 async function startEmbeddedBroker() {
   const broker = aedes();
@@ -39,11 +61,15 @@ async function startEmbeddedBroker() {
   return { broker, server };
 }
 
-function broadcast(msg: WsMessage) {
+function broadcast(msg: WsServerMessage) {
   const raw = JSON.stringify(msg);
   for (const ws of sockets) {
     if (ws.readyState === ws.OPEN) ws.send(raw);
   }
+}
+
+function send(ws: WebSocket, msg: WsServerMessage) {
+  if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg));
 }
 
 function handleTelemetry(raw: string) {
@@ -61,7 +87,48 @@ function handleTelemetry(raw: string) {
   }
 
   latestByAsset.set(data.assetId, data);
+  appendHistory(data);
+  enqueueTelemetry(data);
   broadcast({ type: "telemetry", data });
+  void touchAssetStatus(data);
+
+  for (const alarm of evaluateTelemetry(data)) {
+    broadcast({ type: "alarm", data: alarm });
+    void upsertAlarm(alarm);
+  }
+}
+
+function handleClientMessage(raw: string) {
+  let msg: WsClientMessage;
+  try {
+    msg = JSON.parse(raw) as WsClientMessage;
+  } catch {
+    console.warn("[realtime] invalid WS client JSON, ignored");
+    return;
+  }
+
+  if (msg?.type !== "alarm_ack" || !msg.alarmId) {
+    console.warn("[realtime] unsupported WS client message, ignored");
+    return;
+  }
+
+  const ackedBy =
+    typeof msg.ackedBy === "string" && msg.ackedBy.trim()
+      ? msg.ackedBy.trim().slice(0, 64)
+      : "operator";
+  const existing = getAlarm(msg.alarmId);
+  const latestTemp = existing
+    ? latestByAsset.get(existing.assetId)?.metrics.temperature
+    : undefined;
+  const result = acknowledgeAlarm(msg.alarmId, ackedBy, latestTemp);
+
+  if ("error" in result) {
+    console.warn(`[realtime] alarm_ack rejected: ${result.error} id=${msg.alarmId}`);
+    return;
+  }
+
+  void upsertAlarm(result);
+  broadcast({ type: "alarm", data: result });
 }
 
 function connectMqttBridge() {
@@ -100,18 +167,36 @@ function connectMqttBridge() {
 
 function startHttpAndWs() {
   const server = http.createServer((req, res) => {
-    if (req.url === "/health") {
+    const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+
+    if (url.pathname === "/health") {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(
         JSON.stringify({
           ok: true,
           service: "imc-realtime",
           assets: latestByAsset.size,
+          alarms: listAlarms().length,
+          openAlarms: openAlarmCount(),
+          historyPoints: historyPointCount(),
+          historyMaxPoints: historyMaxPoints(),
+          postgres: dbEnabled(),
+          timescale: timescaleEnabled(),
           clients: sockets.size,
           mqttUrl: MQTT_URL,
           embeddedMqtt: EMBED_MQTT,
         }),
       );
+      return;
+    }
+
+    if (url.pathname === "/history") {
+      const assetId = url.searchParams.get("assetId");
+      const payload = assetId
+        ? { assetId, samples: getHistory(assetId) }
+        : { series: listHistorySeries() };
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify(payload));
       return;
     }
 
@@ -123,21 +208,28 @@ function startHttpAndWs() {
 
   wss.on("connection", (ws) => {
     sockets.add(ws);
-    ws.send(
-      JSON.stringify({
-        type: "hello",
-        service: "imc-realtime",
-        mqttUrl: MQTT_URL,
-        embeddedMqtt: EMBED_MQTT,
-      } satisfies WsMessage),
-    );
-    ws.send(
-      JSON.stringify({
-        type: "snapshot",
-        assets: [...latestByAsset.values()],
-      } satisfies WsMessage),
-    );
+    send(ws, {
+      type: "hello",
+      service: "imc-realtime",
+      mqttUrl: MQTT_URL,
+      embeddedMqtt: EMBED_MQTT,
+    });
+    send(ws, {
+      type: "snapshot",
+      assets: [...latestByAsset.values()],
+    });
+    send(ws, {
+      type: "alarms_snapshot",
+      alarms: listAlarms(),
+    });
+    send(ws, {
+      type: "history_snapshot",
+      series: listHistorySeries(),
+    });
 
+    ws.on("message", (data) => {
+      handleClientMessage(data.toString("utf8"));
+    });
     ws.on("close", () => sockets.delete(ws));
   });
 
@@ -150,6 +242,24 @@ function startHttpAndWs() {
 }
 
 async function main() {
+  try {
+    await initDb();
+    if (dbEnabled()) {
+      const rows = await loadAlarmsFromDb();
+      hydrateAlarms(rows);
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[realtime] postgres init failed (${message}); continuing in-memory`);
+  }
+
+  try {
+    await initTimescale();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[realtime] timescale init failed (${message}); memory history only`);
+  }
+
   if (EMBED_MQTT) {
     try {
       await startEmbeddedBroker();

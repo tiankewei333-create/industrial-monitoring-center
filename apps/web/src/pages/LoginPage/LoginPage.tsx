@@ -23,11 +23,11 @@ export function LoginPage() {
     setError("");
 
     if (!username.trim()) {
-      setError("请输入账号");
+      setError("Username is required");
       return;
     }
     if (!password) {
-      setError("请输入密码");
+      setError("Password is required");
       return;
     }
 
@@ -38,7 +38,7 @@ export function LoginPage() {
       const from = (location.state as { from?: string } | null)?.from;
       navigate(from && from !== "/login" ? from : "/live", { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "登录失败");
+      setError(err instanceof Error ? err.message : "Sign-in failed");
     } finally {
       setLoading(false);
     }
@@ -53,7 +53,7 @@ export function LoginPage() {
             IM<span>C</span>
           </div>
           <h1>Industrial Monitoring Center</h1>
-          <p className="login-title-cn">智能工厂监控中心</p>
+          <p className="login-subtitle">Smart Factory Monitoring</p>
         </div>
 
         <label className="sr-only" htmlFor="imc-username">
@@ -88,11 +88,11 @@ export function LoginPage() {
         {error ? <div className="login-error">{error}</div> : null}
 
         <button className="login-submit" type="submit" disabled={loading}>
-          {loading ? "登录中…" : "Sign In / 登录"}
+          {loading ? "Signing in…" : "Sign In"}
         </button>
 
         <p className="login-hint">
-          试用：observer / observer123 · admin / admin123
+          Demo: observer / observer123 · admin / admin123
         </p>
       </form>
 

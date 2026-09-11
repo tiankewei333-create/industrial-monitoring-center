@@ -6,7 +6,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   const location = useLocation();
   const session = getSession();
 
-  // 如果session失效，主动调转到login页面
+  // Redirect to login when no local session is present.
   if (!session) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }

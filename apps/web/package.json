@@ -2,7 +2,7 @@
   "name": "@imc/web",
   "version": "0.1.0",
   "private": true,
-  "description": "IMC 监控前端（MVP：实时面板）",
+  "description": "IMC web console (login + live panel + asset registry)",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,13 +14,18 @@
   },
   "dependencies": {
     "@imc/shared-types": "0.1.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-router-dom": "^7.18.3"
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.4.0",
+    "echarts": "^6.1.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-router-dom": "^7.18.3",
+    "three": "^0.182.0"
   },
   "devDependencies": {
-    "@types/react": "^19.0.10",
-    "@types/react-dom": "^19.0.4",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.182.0",
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.8.2",
     "vite": "^6.2.2"

@@ -2,7 +2,7 @@
   "name": "@imc/shared-types",
   "version": "0.1.0",
   "private": true,
-  "description": "IMC 共享类型与协议常量",
+  "description": "IMC shared protocol types and constants",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",

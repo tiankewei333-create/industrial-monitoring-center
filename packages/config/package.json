@@ -2,7 +2,7 @@
   "name": "@imc/config",
   "version": "0.1.0",
   "private": true,
-  "description": "IMC 共享配置（端口、主题、默认阈值）",
+  "description": "IMC shared runtime defaults (ports, thresholds)",
   "main": "index.js",
   "scripts": {
     "build": "echo \"[config] noop\" && exit 0",

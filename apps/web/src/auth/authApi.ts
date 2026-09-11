@@ -1,5 +1,11 @@
 import type { AuthSession, UserRole } from "./authStorage";
 
+const fromEnv = String(import.meta.env.VITE_API_URL ?? "").trim();
+const API_URL = (
+  fromEnv ||
+  `${window.location.origin}/api`
+).replace(/\/$/, "");
+
 interface MockAccount {
   username: string;
   password: string;
@@ -7,7 +13,7 @@ interface MockAccount {
   displayName: string;
 }
 
-/** Day2 Mock — 后续换成 imc-api POST /auth/login */
+/** Offline fallback when imc-api / Postgres is down. */
 const MOCK_ACCOUNTS: MockAccount[] = [
   {
     username: "observer",
@@ -29,24 +35,11 @@ const MOCK_ACCOUNTS: MockAccount[] = [
   },
 ];
 
-function delay(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-export async function login(
-  username: string,
-  password: string,
-): Promise<AuthSession> {
-  await delay(350);
-
+function mockLogin(username: string, password: string): AuthSession {
   const found = MOCK_ACCOUNTS.find(
     (a) => a.username === username.trim() && a.password === password,
   );
-
-  if (!found) {
-    throw new Error("账号或密码错误");
-  }
-
+  if (!found) throw new Error("Invalid username or password");
   return {
     token: `mock.${found.username}.${Date.now()}`,
     user: {
@@ -56,3 +49,32 @@ export async function login(
     },
   };
 }
+
+export async function login(
+  username: string,
+  password: string,
+): Promise<AuthSession> {
+  try {
+    const res = await fetch(`${API_URL}/auth/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    if (res.ok) {
+      return (await res.json()) as AuthSession;
+    }
+    if (res.status === 401) {
+      throw new Error("Invalid username or password");
+    }
+    // API up but unexpected — fall through to mock only on network-ish failures
+  } catch (err) {
+    if (err instanceof Error && err.message === "Invalid username or password") {
+      throw err;
+    }
+    console.warn("[auth] API unreachable, using mock login", err);
+  }
+
+  return mockLogin(username, password);
+}
+
+export { API_URL };

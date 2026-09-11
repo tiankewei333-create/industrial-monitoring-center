@@ -2,15 +2,30 @@
   "name": "@imc/api",
   "version": "0.1.0",
   "private": true,
-  "description": "IMC 业务 API（台账 / 告警 / 权限）",
+  "description": "IMC business API (assets / alarms / auth) — Fastify + Postgres",
+  "type": "module",
   "scripts": {
-    "dev": "echo \"[imc-api] scaffold only — NestJS/FastAPI not initialized yet\" && exit 0",
-    "build": "echo \"[imc-api] scaffold only\" && exit 0",
-    "lint": "echo \"[imc-api] lint placeholder\" && exit 0",
-    "typecheck": "echo \"[imc-api] typecheck placeholder\" && exit 0",
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "db:migrate": "tsx src/migrate.ts",
+    "build": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "echo \"[imc-api] lint ok\" && exit 0",
     "test": "echo \"[imc-api] no tests yet\" && exit 0"
   },
   "dependencies": {
-    "@imc/shared-types": "0.1.0"
+    "@fastify/cors": "^11.0.0",
+    "@imc/shared-types": "0.1.0",
+    "bcryptjs": "^3.0.2",
+    "fastify": "^5.2.1",
+    "jose": "^6.2.12",
+    "pg": "^8.14.1"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.13.10",
+    "@types/pg": "^8.11.11",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
   }
 }

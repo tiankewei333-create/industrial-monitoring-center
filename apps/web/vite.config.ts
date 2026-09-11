@@ -14,5 +14,17 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true,
+    proxy: {
+      "/ws": {
+        target: "ws://127.0.0.1:3002",
+        ws: true,
+        changeOrigin: true,
+      },
+      "/api": {
+        target: "http://127.0.0.1:3001",
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/api/, ""),
+      },
+    },
   },
 });

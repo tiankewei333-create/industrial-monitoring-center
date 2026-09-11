@@ -2,7 +2,7 @@
   "name": "industrial-monitoring-center",
   "version": "0.1.0",
   "private": true,
-  "description": "IMC · 单车间工业监控数字孪生（采集 → 存储 → 推送 → 3D/告警）",
+  "description": "IMC single-workshop industrial monitoring digital twin",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -13,18 +13,31 @@
     "dev:realtime": "npm run dev -w @imc/realtime",
     "dev:ingest": "npm run dev -w @imc/ingest",
     "dev:simulator": "npm run dev -w @imc/simulator",
+    "dev:simulator:hot": "npm run dev:hot -w @imc/simulator",
+    "dev:simulator:spike": "npm run dev:spike -w @imc/simulator",
     "dev:live": "concurrently -k -n realtime,simulator,web -c cyan,magenta,green \"npm run dev:realtime\" \"npm run dev:simulator\" \"npm run dev:web\"",
+    "dev:live:db": "concurrently -k -n api,realtime,simulator,web -c yellow,cyan,magenta,green \"npm run dev:api\" \"npm run dev:realtime\" \"npm run dev:simulator\" \"npm run dev:web\"",
+    "dev:live:spike": "concurrently -k -n realtime,simulator,web -c cyan,magenta,green \"npm run dev:realtime\" \"npm run dev:simulator:spike\" \"npm run dev:web\"",
+    "dev:live:hot": "concurrently -k -n realtime,simulator,web -c cyan,magenta,green \"npm run dev:realtime\" \"npm run dev:simulator:hot\" \"npm run dev:web\"",
+    "models:twin": "node scripts/generate-twin-models.mjs",
+    "db:migrate": "npm run db:migrate -w @imc/api",
     "build": "npm run build -w @imc/shared-types && npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "docker:up": "docker compose -f deploy/docker-compose.yml --env-file .env up -d",
-    "docker:down": "docker compose -f deploy/docker-compose.yml --env-file .env down",
+    "docker:up": "docker compose -f deploy/docker-compose.yml --env-file .env --profile infra up -d",
+    "docker:mvp": "docker compose -f deploy/docker-compose.yml --env-file .env --profile mvp up -d --build",
+    "docker:mvp:down": "docker compose -f deploy/docker-compose.yml --env-file .env --profile mvp down",
+    "docker:down": "docker compose -f deploy/docker-compose.yml --env-file .env --profile mvp --profile infra --profile full --profile timeseries down",
     "docker:logs": "docker compose -f deploy/docker-compose.yml --env-file .env logs -f",
     "docker:ps": "docker compose -f deploy/docker-compose.yml --env-file .env ps"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
+  },
+  "overrides": {
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
   },
   "engines": {
     "node": ">=20"

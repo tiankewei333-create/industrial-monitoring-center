@@ -4,7 +4,9 @@
 import pg from "pg";
 import type { TelemetryPayload } from "@imc/shared-types";
 
-const TIMESCALE_URL = process.env.TIMESCALE_URL?.trim() || "";
+const TIMESCALE_URL =
+  process.env.TIMESCALE_URL?.trim() ||
+  "postgres://imc:imc_dev_password@127.0.0.1:5433/imc_ts";
 const FLUSH_MS = Math.max(500, Number(process.env.TIMESCALE_FLUSH_MS ?? 2000));
 const MAX_QUEUE = Math.max(100, Number(process.env.TIMESCALE_QUEUE_MAX ?? 2000));
 

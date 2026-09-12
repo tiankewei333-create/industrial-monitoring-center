@@ -10,7 +10,9 @@ import pg from "pg";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TS_SQL_DIR = path.resolve(__dirname, "../../../deploy/sql/ts");
 
-export const TIMESCALE_URL = process.env.TIMESCALE_URL?.trim() || "";
+export const TIMESCALE_URL =
+  process.env.TIMESCALE_URL?.trim() ||
+  "postgres://imc:imc_dev_password@127.0.0.1:5433/imc_ts";
 
 let pool: pg.Pool | null = null;
 

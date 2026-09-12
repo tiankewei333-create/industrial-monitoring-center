@@ -73,12 +73,14 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        mosquitto_passwd -b -c /tmp/passwd "$${MQTT_USER}" "$${MQTT_PASSWORD}"
-        chmod 0400 /tmp/passwd
+        rm -f /mosquitto/config/passwd /tmp/passwd
+        mosquitto_passwd -b -c /mosquitto/config/passwd "$${MQTT_USER}" "$${MQTT_PASSWORD}"
+        chown mosquitto:mosquitto /mosquitto/config/passwd
+        chmod 0400 /mosquitto/config/passwd
         printf '%s\n' \
           'listener 1883' \
           'allow_anonymous false' \
-          'password_file /tmp/passwd' \
+          'password_file /mosquitto/config/passwd' \
           'persistence true' \
           'persistence_location /mosquitto/data/' \
           'log_dest stdout' \

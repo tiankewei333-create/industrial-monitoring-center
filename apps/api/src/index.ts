@@ -6,10 +6,14 @@ import type {
   AssetRecord,
   AssetStatus,
   AssetType,
+  EnergyAssetRow,
+  EnergyHourlyRow,
+  EnergyOverview,
   HistorySample,
   KpiOverview,
   KpiAssetRow,
 } from "@imc/shared-types";
+import { estimateEnergyKwh } from "@imc/shared-types";
 import { pingDb, pool } from "./db.js";
 import { requireAdmin } from "./auth.js";
 import { signAccessToken } from "./jwt.js";
@@ -20,6 +24,9 @@ import {
   timescaleEnabled,
 } from "./timescale.js";
 import { registerWorkOrderRoutes } from "./workOrders.js";
+import { registerOpsRoutes } from "./ops.js";
+import { writeAudit } from "./audit.js";
+import { assertJwtSecret, corsOrigin, loginRateLimited } from "./hardening.js";
 
 const PORT = Number(process.env.PORT ?? process.env.API_PORT ?? 3001);
 const HOST = process.env.HOST ?? "0.0.0.0";
@@ -120,12 +127,18 @@ function parseRange(fromRaw?: string, toRaw?: string, defaultHours = 24) {
 }
 
 async function main() {
+  assertJwtSecret();
   if (AUTO_MIGRATE) {
     await migrateAndSeed();
   }
 
   const app = Fastify({ logger: true });
-  await app.register(cors, { origin: true });
+  await app.register(cors, { origin: corsOrigin() });
+  app.addHook("onSend", async (_req, reply) => {
+    reply.header("X-Content-Type-Options", "nosniff");
+    reply.header("X-Frame-Options", "DENY");
+    reply.header("Referrer-Policy", "no-referrer");
+  });
 
   app.get("/health", async () => {
     let db = false;
@@ -154,6 +167,10 @@ async function main() {
   app.post<{
     Body: { username?: string; password?: string };
   }>("/auth/login", async (req, reply) => {
+    const ip = req.ip || "unknown";
+    if (loginRateLimited(ip)) {
+      return reply.code(429).send({ error: "too_many_attempts" });
+    }
     const username = String(req.body?.username ?? "").trim();
     const password = String(req.body?.password ?? "");
     if (!username || !password) {
@@ -236,6 +253,14 @@ async function main() {
          RETURNING asset_id, name, type, zone, status, updated_at`,
         [assetId, name, type, zone, status],
       );
+      await writeAudit(pool, {
+        actor: auth.user.username,
+        role: auth.user.role,
+        action: "asset_create",
+        entityType: "asset",
+        entityId: assetId,
+        detail: { name, type, zone, status },
+      });
       return reply.code(201).send({ asset: mapAsset(r.rows[0]) });
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code;
@@ -308,6 +333,14 @@ async function main() {
     if (!r.rows[0]) {
       return reply.code(404).send({ error: "not_found" });
     }
+    await writeAudit(pool, {
+      actor: auth.user.username,
+      role: auth.user.role,
+      action: "asset_update",
+      entityType: "asset",
+      entityId: assetId,
+      detail: req.body as Record<string, unknown>,
+    });
     return { asset: mapAsset(r.rows[0]) };
   });
 
@@ -324,6 +357,13 @@ async function main() {
     if (!r.rowCount) {
       return reply.code(404).send({ error: "not_found" });
     }
+    await writeAudit(pool, {
+      actor: auth.user.username,
+      role: auth.user.role,
+      action: "asset_delete",
+      entityType: "asset",
+      entityId: req.params.assetId,
+    });
     return reply.code(204).send();
   });
 
@@ -473,6 +513,89 @@ async function main() {
   });
 
   app.get<{
+    Querystring: { from?: string; to?: string };
+  }>("/energy", async (req, reply) => {
+    const tsPool = getTimescalePool();
+    if (!tsPool) {
+      return reply.code(503).send({
+        error: "timescale_unavailable",
+        hint: "Set TIMESCALE_URL and run db:migrate",
+      });
+    }
+    const range = parseRange(req.query.from, req.query.to, 24);
+    if (!range) {
+      return reply.code(400).send({ error: "invalid_range" });
+    }
+
+    const byAsset = await tsPool.query<{
+      asset_id: string;
+      samples: string;
+      avg_power: number | null;
+    }>(
+      `SELECT
+         asset_id,
+         count(*)::text AS samples,
+         avg(power)::float8 AS avg_power
+       FROM telemetry
+       WHERE ts >= $1 AND ts <= $2
+       GROUP BY asset_id
+       ORDER BY asset_id ASC`,
+      [range.from, range.to],
+    );
+
+    const hourly = await tsPool.query<{
+      ts: Date;
+      avg_power: number | null;
+      samples: string;
+    }>(
+      `SELECT
+         time_bucket('1 hour', ts) AS ts,
+         avg(power)::float8 AS avg_power,
+         count(*)::text AS samples
+       FROM telemetry
+       WHERE ts >= $1 AND ts <= $2
+       GROUP BY 1
+       ORDER BY 1 ASC`,
+      [range.from, range.to],
+    );
+
+    const assets: EnergyAssetRow[] = byAsset.rows.map((row) => {
+      const avgPowerKw = row.avg_power != null ? Number(row.avg_power) : 0;
+      return {
+        assetId: row.asset_id,
+        samples: Number(row.samples),
+        avgPowerKw,
+        energyKwh: estimateEnergyKwh(avgPowerKw, range.spanMs),
+      };
+    });
+    const hourlyRows: EnergyHourlyRow[] = hourly.rows.map((row) => {
+      const avgPowerKw = row.avg_power != null ? Number(row.avg_power) : 0;
+      return {
+        ts: row.ts.getTime(),
+        avgPowerKw,
+        energyKwh: estimateEnergyKwh(avgPowerKw, 3_600_000),
+      };
+    });
+    const totalKwh = assets.reduce((s, a) => s + a.energyKwh, 0);
+    const sampleCount = assets.reduce((s, a) => s + a.samples, 0);
+    const weighted =
+      sampleCount > 0
+        ? assets.reduce((s, a) => s + a.avgPowerKw * a.samples, 0) / sampleCount
+        : 0;
+    const overview: EnergyOverview = {
+      from: range.from.toISOString(),
+      to: range.to.toISOString(),
+      source: "timescale",
+      spanHours: range.spanMs / 3_600_000,
+      totalKwh,
+      avgPowerKw: weighted,
+      assets,
+      hourly: hourlyRows,
+    };
+    return overview;
+  });
+
+  app.get<{
     Querystring: { state?: string; limit?: string };
   }>("/alarms", async (req) => {
     const state = req.query.state?.toUpperCase();
@@ -498,6 +621,7 @@ async function main() {
   });
 
   registerWorkOrderRoutes(app, pool);
+  registerOpsRoutes(app, pool);
 
   await app.listen({ port: PORT, host: HOST });
   console.log(`[api] http://127.0.0.1:${PORT}/health`);

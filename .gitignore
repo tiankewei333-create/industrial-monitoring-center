@@ -13,7 +13,7 @@ Thumbs.db
 .turbo/
 .next/
 .cache/
-tmp/
+backups/
 temp/
 assets/models/*.glb
 assets/models/*.gltf

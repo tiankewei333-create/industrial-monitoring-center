@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import type { AssetRecord, AssetStatus, AssetType } from "@imc/shared-types";
 import {
   createAsset,
@@ -7,6 +7,7 @@ import {
   listAssets,
   updateAsset,
 } from "../../assets/mockAssets";
+import { PrimaryNav } from "../../layout/PrimaryNav";
 import { clearSession, getSession } from "../../auth/authStorage";
 import "./AssetsPage.css";
 
@@ -186,17 +187,7 @@ export function AssetsPage() {
           </p>
         </div>
         <div className="assets-right">
-          <nav className="assets-nav" aria-label="Primary">
-            <Link to="/live">Live panel</Link>
-            <span className="assets-nav-current" aria-current="page">
-              Assets
-            </span>
-            <Link to="/alarms">Alarms</Link>
-            <Link to="/work-orders">Work orders</Link>
-            <Link to="/history">History</Link>
-            <Link to="/kpi">KPI</Link>
-            <Link to="/twin">Twin</Link>
-          </nav>
+          <PrimaryNav ns="assets" current="assets" />
           {session ? (
             <div className="assets-user">
               <span>

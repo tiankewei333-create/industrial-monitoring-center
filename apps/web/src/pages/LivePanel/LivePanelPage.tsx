@@ -1,7 +1,9 @@
 import { useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { clearSession, getSession } from "../../auth/authStorage";
+import { PrimaryNav } from "../../layout/PrimaryNav";
 import { useRealtimeWs } from "../../realtime/useRealtimeWs";
+import { zScoreAnomaly } from "@imc/shared-types";
 import { Sparkline } from "../HistoryPage/Sparkline";
 import "./LivePanel.css";
 
@@ -30,24 +32,7 @@ export function LivePanelPage() {
           <p className="live-sub">Workshop A · MQTT → Realtime → WebSocket</p>
         </div>
         <div className="live-right">
-          <nav className="live-nav" aria-label="Primary">
-            <span className="live-nav-current" aria-current="page">
-              Live panel
-            </span>
-            <Link to="/assets">Assets</Link>
-            <Link to="/alarms" className="live-nav-alarms">
-              Alarms
-              {activeCount > 0 ? (
-                <span className="live-nav-badge" aria-label={`${activeCount} active`}>
-                  {activeCount}
-                </span>
-              ) : null}
-            </Link>
-            <Link to="/work-orders">Work orders</Link>
-            <Link to="/history">History</Link>
-            <Link to="/kpi">KPI</Link>
-            <Link to="/twin">Twin</Link>
-          </nav>
+          <PrimaryNav ns="live" current="live" activeCount={activeCount} />
           <div className="live-badges">
             <span className={`live-badge ${conn === "open" ? "ok" : "bad"}`}>
               WS {conn}
@@ -60,6 +45,9 @@ export function LivePanelPage() {
                 {activeCount} ACTIVE
               </Link>
             ) : null}
+            <Link to="/wall" className="live-badge">
+              Wallboard
+            </Link>
           </div>
           {session ? (
             <div className="live-user">
@@ -79,12 +67,17 @@ export function LivePanelPage() {
 
       {list.length === 0 ? (
         <div className="live-empty">
-          Waiting for telemetry… start <code>npm run dev:realtime</code> and{" "}
-          <code>npm run dev:simulator</code>
+          Waiting for telemetry… start <code>npm run dev:live</code> (fleet of 8
+          workshop assets).
         </div>
       ) : (
         <div className="live-grid">
-          {list.map((a) => (
+          {list.map((a) => {
+            const temps = (historyByAsset[a.assetId] ?? [])
+              .slice(-30)
+              .map((s) => s.temperature);
+            const anomaly = zScoreAnomaly(temps);
+            return (
             <article key={a.assetId} className="live-card">
               <div className="live-card-head">
                 <h2>
@@ -96,6 +89,9 @@ export function LivePanelPage() {
                   {a.status}
                 </span>
               </div>
+              {anomaly ? (
+                <p className="live-anomaly">Temperature z-score anomaly</p>
+              ) : null}
               <Sparkline
                 values={(historyByAsset[a.assetId] ?? []).slice(-80).map((s) => s.temperature)}
                 hot={a.metrics.temperature >= 80}
@@ -116,7 +112,8 @@ export function LivePanelPage() {
                 updated {new Date(a.ts).toLocaleTimeString()}
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

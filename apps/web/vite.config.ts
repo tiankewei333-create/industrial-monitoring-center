@@ -14,6 +14,7 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true,
+    strictPort: true,
     proxy: {
       "/ws": {
         target: "ws://127.0.0.1:3002",

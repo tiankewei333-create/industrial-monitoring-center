@@ -152,6 +152,26 @@
   gap: 14px;
 }
 
+.twin-view-toggle {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.twin-view-toggle button {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.twin-view-toggle button.on {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
 .twin-canvas {
   min-height: 520px;
   height: calc(100vh - 220px);

@@ -1,5 +1,11 @@
 import pg from "pg";
-import type { AlarmRecord, AssetStatus, TelemetryPayload } from "@imc/shared-types";
+import {
+  DEFAULT_THRESHOLDS,
+  type AlarmRecord,
+  type AssetStatus,
+  type TelemetryPayload,
+  type Thresholds,
+} from "@imc/shared-types";
 
 const DATABASE_URL = process.env.DATABASE_URL?.trim();
 
@@ -119,6 +125,79 @@ export async function loadAlarmsFromDb(): Promise<AlarmRecord[]> {
     clearedAt: row.cleared_at ? row.cleared_at.getTime() : undefined,
     ackedBy: row.acked_by ?? undefined,
   }));
+}
+
+export async function loadThresholdConfig(): Promise<{
+  global: Thresholds;
+  overrides: Record<string, Partial<Thresholds>>;
+} | null> {
+  if (!pool) return null;
+  const globalRow = await pool.query<{ value: Thresholds }>(
+    `SELECT value FROM app_settings WHERE key = 'thresholds'`,
+  );
+  const raw = globalRow.rows[0]?.value;
+  const global: Thresholds = {
+    temperatureMaxC: Number(raw?.temperatureMaxC) || DEFAULT_THRESHOLDS.temperatureMaxC,
+    powerMaxKw: Number(raw?.powerMaxKw) || DEFAULT_THRESHOLDS.powerMaxKw,
+    offlineTimeoutSec:
+      Number(raw?.offlineTimeoutSec) || DEFAULT_THRESHOLDS.offlineTimeoutSec,
+  };
+
+  const assets = await pool.query<{
+    asset_id: string;
+    temperature_max_c: number | null;
+    power_max_kw: number | null;
+    offline_timeout_sec: number | null;
+  }>(
+    `SELECT asset_id, temperature_max_c, power_max_kw, offline_timeout_sec
+     FROM assets`,
+  );
+
+  const overrides: Record<string, Partial<Thresholds>> = {};
+  for (const row of assets.rows) {
+    const partial: Partial<Thresholds> = {};
+    if (row.temperature_max_c != null) {
+      partial.temperatureMaxC = Number(row.temperature_max_c);
+    }
+    if (row.power_max_kw != null) {
+      partial.powerMaxKw = Number(row.power_max_kw);
+    }
+    if (row.offline_timeout_sec != null) {
+      partial.offlineTimeoutSec = Number(row.offline_timeout_sec);
+    }
+    if (Object.keys(partial).length > 0) {
+      overrides[row.asset_id] = partial;
+    }
+  }
+  return { global, overrides };
+}
+
+export async function writeAudit(entry: {
+  actor: string;
+  role?: string;
+  action: string;
+  entityType: string;
+  entityId?: string;
+  detail?: Record<string, unknown>;
+}) {
+  if (!pool) return;
+  try {
+    await pool.query(
+      `INSERT INTO audit_log (actor, role, action, entity_type, entity_id, detail)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+      [
+        entry.actor,
+        entry.role ?? null,
+        entry.action,
+        entry.entityType,
+        entry.entityId ?? null,
+        JSON.stringify(entry.detail ?? {}),
+      ],
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[realtime] writeAudit failed: ${message}`);
+  }
 }
 
 export type { AssetStatus };

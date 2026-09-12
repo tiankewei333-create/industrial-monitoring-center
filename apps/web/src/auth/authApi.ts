@@ -59,6 +59,7 @@ export async function login(
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ username, password }),
+      signal: AbortSignal.timeout(2500),
     });
     if (res.ok) {
       return (await res.json()) as AuthSession;

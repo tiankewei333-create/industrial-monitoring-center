@@ -62,13 +62,18 @@ flowchart TB
 | Backend bridge to UI | Done | Browser does not talk to the broker |
 | Live temp / speed / power | Done | “Is the machine moving?” |
 | Login / roles | Postgres + JWT (mock fallback) | Who can view / operate |
-| Alarm closed loop | Memory + Postgres | Persist raise/ack/clear; hydrate on restart |
-| History curves | Memory + Timescale | Live ~15 min; API 1h/6h/24h downsampled |
+| Alarm closed loop | TEMP_HIGH / POWER_HIGH / OFFLINE + Postgres | Raise / ack / clear; hydrate on restart |
+| History curves | Memory + Timescale | Live ~15 min; API 1h/6h/24h downsampled; 30d retention |
 | 3D twin | R3F + glTF + heat shader | Pick + status lamps + temp ramp 40→90°C |
 | Docker MVP | Compose profile `mvp` | Postgres + Timescale + Mosquitto + api + realtime + sim + web |
 | Asset registry | Postgres CRUD (admin) | Create / update / delete; status by realtime |
-| KPI / energy | Availability KPI done | `/kpi` from Timescale; energy panel later |
+| KPI / energy | Done | `/kpi` availability + `/energy` estimated kWh from avg power × hours |
+| 2D floor / wallboard | Done | `/twin` 3D|2D toggle; `/wall` shift screen |
+| CSV export | Done | History, alarms, KPI |
+| MQTT auth | Compose | Password file; local Aedes stays anonymous |
 | Work orders | Alarm → WO done | Create from alarms; Start / Done |
+| Thresholds | Postgres + `/settings` | Global + per-asset; realtime reload ~5s |
+| Audit | Postgres `audit_log` | Ack, assets, WO, threshold changes |
 
 ---
 
@@ -103,15 +108,12 @@ Simulator/device → MQTT → realtime → WebSocket → operator console.
 
 ### Alarm loop
 
-**MVP (done, in-memory):**
-
-1. Simulator publishes temperature > `DEFAULT_THRESHOLDS.temperatureMaxC` (80).
-2. `imc-realtime` raises `TEMP_HIGH` → state `ACTIVE` (no duplicate while open).
+1. Simulator publishes temperature > configured `temperatureMaxC` (default 80), power > `powerMaxKw`, or goes silent.
+2. `imc-realtime` raises `TEMP_HIGH` / `POWER_HIGH` / `OFFLINE` → state `ACTIVE` (no duplicate while open).
 3. Web `/alarms` lists alarms; Live shows ACTIVE badge.
-4. `operator` / `admin` send WS `alarm_ack` → `ACKED`.
-5. When temperature ≤ threshold after ack → `CLEARED`.
-
-**Later:** persist to Postgres via `imc-api`, work orders, OFFLINE timeout rule, 3D highlight.
+4. `operator` / `admin` authenticate on WS then send `alarm_ack` → `ACKED` (Ack identity is the JWT subject).
+5. When the condition is gone after ack → `CLEARED`.
+6. Ack / asset / work-order / threshold writes land in `audit_log`.
 
 See [protocol.md](./protocol.md) and README acceptance checklist.
 
@@ -131,7 +133,7 @@ Create asset → bind topics → set thresholds → assign zone → appears in c
 |---|---|
 | `simulator` | Pretend to be a machine; publish MQTT |
 | `ingest` | Unify ingress (MVP: inside realtime) |
-| `realtime` | Subscribe MQTT; evaluate TEMP_HIGH; push WS (telemetry + alarms) |
+| `realtime` | Subscribe MQTT; evaluate TEMP/POWER/OFFLINE; push WS; verify Ack JWT |
 | `api` | Login, assets, alarms REST, RBAC |
 | `web` | Human UI |
 | `shared-types` | Shared protocol dictionary |

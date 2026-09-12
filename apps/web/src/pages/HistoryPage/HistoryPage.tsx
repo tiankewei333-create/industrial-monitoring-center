@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import type { HistorySample } from "@imc/shared-types";
 import {
   fetchHistory,
   type HistoryRangeHours,
 } from "../../api/historyApi";
 import { clearSession, getSession } from "../../auth/authStorage";
+import { PrimaryNav } from "../../layout/PrimaryNav";
+import { downloadCsv } from "../../lib/csv";
 import { useRealtimeWs } from "../../realtime/useRealtimeWs";
 import { MetricChart, type MetricKey } from "./MetricChart";
 import "./HistoryPage.css";
@@ -25,6 +27,8 @@ export function HistoryPage() {
   const [dbMeta, setDbMeta] = useState<string | null>(null);
   const [dbError, setDbError] = useState<string | null>(null);
   const [loadingDb, setLoadingDb] = useState(false);
+  const [cursor, setCursor] = useState<number | null>(null);
+  const [playing, setPlaying] = useState(false);
 
   const assetIds = useMemo(() => {
     const ids = new Set([
@@ -97,7 +101,29 @@ export function HistoryPage() {
         ? dbSamples
         : liveSamples;
 
-  const latest = selected ? assets[selected] : undefined;
+  useEffect(() => {
+    setCursor(samples.length ? samples.length - 1 : null);
+    setPlaying(false);
+  }, [selected, hours]);
+
+  useEffect(() => {
+    if (!playing || samples.length < 2) return;
+    const id = window.setInterval(() => {
+      setCursor((c) => {
+        const i = c ?? 0;
+        if (i >= samples.length - 1) {
+          setPlaying(false);
+          return samples.length - 1;
+        }
+        return i + 1;
+      });
+    }, 250);
+    return () => window.clearInterval(id);
+  }, [playing, samples.length]);
+
+  const playSample =
+    cursor != null && samples[cursor] ? samples[cursor] : samples[samples.length - 1];
+
   const sourceLabel = preferDb
     ? dbError
       ? `Timescale error → live buffer`
@@ -122,24 +148,7 @@ export function HistoryPage() {
           </p>
         </div>
         <div className="history-right">
-          <nav className="history-nav" aria-label="Primary">
-            <Link to="/live">Live panel</Link>
-            <Link to="/assets">Assets</Link>
-            <Link to="/alarms">
-              Alarms
-              {activeCount > 0 ? (
-                <span className="history-nav-badge" aria-label={`${activeCount} active`}>
-                  {activeCount}
-                </span>
-              ) : null}
-            </Link>
-            <Link to="/work-orders">Work orders</Link>
-            <span className="history-nav-current" aria-current="page">
-              History
-            </span>
-            <Link to="/kpi">KPI</Link>
-            <Link to="/twin">Twin</Link>
-          </nav>
+          <PrimaryNav ns="history" current="history" activeCount={activeCount} />
           <div className="history-badges">
             <span className={`history-badge ${conn === "open" ? "ok" : "bad"}`}>
               WS {conn}
@@ -221,11 +230,57 @@ export function HistoryPage() {
             </div>
             <div className="history-count">
               {samples.length} pts
-              {latest
-                ? ` · now ${latest.metrics.temperature.toFixed(1)}°C`
+              {playSample
+                ? ` · ${new Date(playSample.ts).toLocaleTimeString()} T=${playSample.temperature.toFixed(1)}°C`
                 : ""}
             </div>
+            <button
+              type="button"
+              className="history-csv"
+              disabled={samples.length === 0}
+              onClick={() =>
+                downloadCsv(`history-${selected}-${hours}h.csv`, [
+                  ["ts", "temperature", "speed", "power", "status"],
+                  ...samples.map((s) => [
+                    new Date(s.ts).toISOString(),
+                    s.temperature,
+                    s.speed,
+                    s.power,
+                    s.status,
+                  ]),
+                ])
+              }
+            >
+              CSV
+            </button>
           </section>
+
+          {samples.length >= 2 ? (
+            <section className="history-play" aria-label="Playback">
+              <button
+                type="button"
+                onClick={() => {
+                  if (cursor === samples.length - 1) setCursor(0);
+                  setPlaying((p) => !p);
+                }}
+              >
+                {playing ? "Pause" : "Play"}
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={Math.max(0, samples.length - 1)}
+                value={cursor ?? 0}
+                onChange={(e) => {
+                  setPlaying(false);
+                  setCursor(Number(e.target.value));
+                }}
+              />
+              <span>
+                {cursor != null ? cursor + 1 : 0}/{samples.length}
+              </span>
+            </section>
+          ) : null}
 
           <div className="history-chart-wrap">
             {samples.length < 2 ? (

@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { clearSession, getSession } from "../../auth/authStorage";
+import { PrimaryNav } from "../../layout/PrimaryNav";
 import { useRealtimeWs } from "../../realtime/useRealtimeWs";
 import { TWIN_PLACEMENTS } from "./twinLayout";
+import { FloorPlan } from "./FloorPlan";
 import { WorkshopScene } from "./WorkshopScene";
 import "./TwinPage.css";
 
@@ -11,6 +13,7 @@ export function TwinPage() {
   const session = getSession();
   const { conn, mqttConnected, assets, alarms, activeCount } = useRealtimeWs();
   const [selectedId, setSelectedId] = useState<string | null>("Machine001");
+  const [view, setView] = useState<"3d" | "2d">("3d");
 
   const activeAlarmIds = useMemo(() => {
     const set = new Set<string>();
@@ -35,28 +38,11 @@ export function TwinPage() {
           <div className="twin-brand">IMC</div>
           <h1>Workshop Twin</h1>
           <p className="twin-sub">
-            Workshop A · R3F + glTF · temperature heat shader (40→90°C)
+            Workshop A · 3D glTF / 2D floor · live status + heat shader
           </p>
         </div>
         <div className="twin-right">
-          <nav className="twin-nav" aria-label="Primary">
-            <Link to="/live">Live panel</Link>
-            <Link to="/assets">Assets</Link>
-            <Link to="/alarms">
-              Alarms
-              {activeCount > 0 ? (
-                <span className="twin-nav-badge" aria-label={`${activeCount} active`}>
-                  {activeCount}
-                </span>
-              ) : null}
-            </Link>
-            <Link to="/work-orders">Work orders</Link>
-            <Link to="/history">History</Link>
-            <Link to="/kpi">KPI</Link>
-            <span className="twin-nav-current" aria-current="page">
-              Twin
-            </span>
-          </nav>
+          <PrimaryNav ns="twin" current="twin" activeCount={activeCount} />
           <div className="twin-badges">
             <span className={`twin-badge ${conn === "open" ? "ok" : "bad"}`}>
               WS {conn}
@@ -79,13 +65,39 @@ export function TwinPage() {
         </div>
       </header>
 
+      <div className="twin-view-toggle" role="tablist" aria-label="Twin view">
+        <button
+          type="button"
+          className={view === "3d" ? "on" : undefined}
+          onClick={() => setView("3d")}
+        >
+          3D
+        </button>
+        <button
+          type="button"
+          className={view === "2d" ? "on" : undefined}
+          onClick={() => setView("2d")}
+        >
+          2D floor
+        </button>
+      </div>
+
       <div className="twin-body">
-        <WorkshopScene
-          liveByAsset={assets}
-          selectedId={selectedId}
-          activeAlarmIds={activeAlarmIds}
-          onSelect={setSelectedId}
-        />
+        {view === "3d" ? (
+          <WorkshopScene
+            liveByAsset={assets}
+            selectedId={selectedId}
+            activeAlarmIds={activeAlarmIds}
+            onSelect={setSelectedId}
+          />
+        ) : (
+          <FloorPlan
+            liveByAsset={assets}
+            selectedId={selectedId}
+            activeAlarmIds={activeAlarmIds}
+            onSelect={setSelectedId}
+          />
+        )}
 
         <aside className="twin-side" aria-label="Asset detail">
           {selectedPlacement ? (
@@ -126,8 +138,8 @@ export function TwinPage() {
                 </dl>
               ) : (
                 <p className="twin-hint">
-                  No live telemetry yet for this asset (simulator currently
-                  publishes Machine001).
+                  No live telemetry yet for this asset. Start the fleet
+                  simulator (<code>SIM_FLEET=all</code> is the default).
                 </p>
               )}
 

@@ -65,11 +65,28 @@ services:
     image: eclipse-mosquitto:2
     container_name: imc-mosquitto
     restart: unless-stopped
+    user: root
     profiles: ["mvp", "full", "infra"]
+    environment:
+      MQTT_USER: ${MQTT_USER:-imc}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-imc_mqtt_password}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        mosquitto_passwd -b -c /tmp/passwd "$${MQTT_USER}" "$${MQTT_PASSWORD}"
+        chmod 0400 /tmp/passwd
+        printf '%s\n' \
+          'listener 1883' \
+          'allow_anonymous false' \
+          'password_file /tmp/passwd' \
+          'persistence true' \
+          'persistence_location /mosquitto/data/' \
+          'log_dest stdout' \
+          > /tmp/mosquitto.conf
+        exec mosquitto -c /tmp/mosquitto.conf
     ports:
       - "${MQTT_PORT:-1883}:1883"
     volumes:
-      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - imc_mqtt_data:/mosquitto/data
       - imc_mqtt_log:/mosquitto/log
 
@@ -88,6 +105,11 @@ services:
       HISTORY_MAX_POINTS: ${HISTORY_MAX_POINTS:-900}
       DATABASE_URL: postgres://${POSTGRES_USER:-imc}:${POSTGRES_PASSWORD:-imc_dev_password}@postgres:5432/${POSTGRES_DB:-imc}
       TIMESCALE_URL: postgres://${POSTGRES_USER:-imc}:${POSTGRES_PASSWORD:-imc_dev_password}@timescale:5432/imc_ts
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      MQTT_USER: ${MQTT_USER:-imc}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-imc_mqtt_password}
+      MQTT_USERNAME: ${MQTT_USER:-imc}
+      NODE_ENV: production
     ports:
       - "${REALTIME_PORT:-3002}:3002"
     depends_on:
@@ -107,7 +129,11 @@ services:
     profiles: ["mvp", "full"]
     environment:
       MQTT_URL: mqtt://mosquitto:1883
+      MQTT_USER: ${MQTT_USER:-imc}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-imc_mqtt_password}
+      MQTT_USERNAME: ${MQTT_USER:-imc}
       ASSET_ID: ${ASSET_ID:-Machine001}
+      SIM_FLEET: ${SIM_FLEET:-all}
       SIM_INTERVAL_MS: ${SIM_INTERVAL_MS:-1000}
     depends_on:
       - mosquitto
@@ -124,6 +150,8 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-imc}:${POSTGRES_PASSWORD:-imc_dev_password}@postgres:5432/${POSTGRES_DB:-imc}
       TIMESCALE_URL: postgres://${POSTGRES_USER:-imc}:${POSTGRES_PASSWORD:-imc_dev_password}@timescale:5432/imc_ts
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      IMC_ALLOW_DEFAULT_JWT: ${IMC_ALLOW_DEFAULT_JWT:-true}
+      NODE_ENV: production
     ports:
       - "${API_PORT:-3001}:3001"
     depends_on:
@@ -155,6 +183,9 @@ services:
     profiles: ["full"]
     environment:
       MQTT_URL: mqtt://mosquitto:1883
+      MQTT_USER: ${MQTT_USER:-imc}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-imc_mqtt_password}
+      MQTT_USERNAME: ${MQTT_USER:-imc}
     depends_on:
       - mosquitto
 

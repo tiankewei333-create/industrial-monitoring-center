@@ -190,6 +190,16 @@
   white-space: nowrap;
 }
 
+.kpi-csv {
+  margin: 12px 0 0;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
 .kpi-table th {
   font-size: 12px;
   letter-spacing: 0.04em;

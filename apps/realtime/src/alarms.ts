@@ -1,18 +1,40 @@
 import {
   DEFAULT_THRESHOLDS,
+  mergeThresholds,
   type AlarmRecord,
   type AlarmRule,
+  type AlarmSeverity,
   type TelemetryPayload,
+  type Thresholds,
 } from "@imc/shared-types";
-
-const TEMP_RULE: AlarmRule = "TEMP_HIGH";
-const TEMP_MAX = DEFAULT_THRESHOLDS.temperatureMaxC;
 
 /** All alarms for this process (including CLEARED). */
 const alarmsById = new Map<string, AlarmRecord>();
 
 /** Open key → alarmId for asset+rule while ACTIVE/ACKED. */
 const openByKey = new Map<string, string>();
+
+let globalThresholds: Thresholds = { ...DEFAULT_THRESHOLDS };
+const assetOverrides = new Map<string, Partial<Thresholds>>();
+
+export function applyThresholdConfig(
+  global: Thresholds,
+  overrides: Record<string, Partial<Thresholds>> = {},
+) {
+  globalThresholds = mergeThresholds(DEFAULT_THRESHOLDS, global);
+  assetOverrides.clear();
+  for (const [assetId, partial] of Object.entries(overrides)) {
+    assetOverrides.set(assetId, partial);
+  }
+}
+
+export function resolvedThresholds(assetId: string): Thresholds {
+  return mergeThresholds(globalThresholds, assetOverrides.get(assetId));
+}
+
+export function currentGlobalThresholds(): Thresholds {
+  return { ...globalThresholds };
+}
 
 function openKey(assetId: string, rule: AlarmRule) {
   return `${assetId}:${rule}`;
@@ -28,6 +50,14 @@ export function getAlarm(alarmId: string): AlarmRecord | undefined {
 
 export function openAlarmCount(): number {
   return openByKey.size;
+}
+
+/** Test helper — not used in production. */
+export function resetAlarmState() {
+  alarmsById.clear();
+  openByKey.clear();
+  globalThresholds = { ...DEFAULT_THRESHOLDS };
+  assetOverrides.clear();
 }
 
 function upsert(alarm: AlarmRecord): AlarmRecord {
@@ -54,84 +84,199 @@ function findOpen(assetId: string, rule: AlarmRule): AlarmRecord | undefined {
   return id ? alarmsById.get(id) : undefined;
 }
 
-function raiseTempHigh(data: TelemetryPayload): AlarmRecord {
-  const raisedAt = data.ts || Date.now();
+function raise(
+  assetId: string,
+  rule: AlarmRule,
+  value: number,
+  threshold: number,
+  severity: AlarmSeverity,
+  raisedAt: number,
+): AlarmRecord {
   const alarm: AlarmRecord = {
-    alarmId: `alm_${data.assetId}_${TEMP_RULE}_${raisedAt}`,
-    assetId: data.assetId,
-    rule: TEMP_RULE,
-    severity: "CRITICAL",
+    alarmId: `alm_${assetId}_${rule}_${raisedAt}`,
+    assetId,
+    rule,
+    severity,
     state: "ACTIVE",
-    value: data.metrics.temperature,
-    threshold: TEMP_MAX,
+    value,
+    threshold,
     raisedAt,
   };
   return upsert(alarm);
 }
 
 /**
- * Evaluate TEMP_HIGH after each telemetry sample.
- * Returns alarms that changed (raise / value update / clear).
+ * High-side analog rule (TEMP_HIGH / POWER_HIGH).
+ * Returns alarms that should be broadcast (raise / clear), not silent value ticks.
  */
-export function evaluateTelemetry(data: TelemetryPayload): AlarmRecord[] {
+function evaluateHigh(
+  assetId: string,
+  rule: AlarmRule,
+  value: number,
+  threshold: number,
+  severity: AlarmSeverity,
+  raisedAt: number,
+): AlarmRecord[] {
   const changed: AlarmRecord[] = [];
-  const temp = data.metrics.temperature;
-  const open = findOpen(data.assetId, TEMP_RULE);
+  const open = findOpen(assetId, rule);
 
-  if (temp > TEMP_MAX) {
+  if (value > threshold) {
     if (!open) {
-      const raised = raiseTempHigh(data);
+      const raised = raise(assetId, rule, value, threshold, severity, raisedAt);
       console.log(
-        `[realtime] alarm RAISE ${raised.alarmId} T=${raised.value}°C > ${TEMP_MAX}`,
+        `[realtime] alarm RAISE ${raised.alarmId} ${value} > ${threshold}`,
       );
       changed.push(raised);
-    } else if (open.value !== temp) {
-      // Keep open (no re-raise); refresh peak/current value silently.
-      upsert({ ...open, value: temp });
+    } else if (open.value !== value || open.threshold !== threshold) {
+      upsert({ ...open, value, threshold });
     }
     return changed;
   }
 
-  // Temperature back at/below threshold → clear only after ACKED
   if (open?.state === "ACKED") {
     const cleared = upsert({
       ...open,
       state: "CLEARED",
-      value: temp,
+      value,
+      threshold,
       clearedAt: Date.now(),
     });
-    console.log(`[realtime] alarm CLEAR ${cleared.alarmId} T=${temp}°C`);
+    console.log(`[realtime] alarm CLEAR ${cleared.alarmId}`);
     changed.push(cleared);
-  } else if (open?.state === "ACTIVE" && open.value !== temp) {
-    upsert({ ...open, value: temp });
+  } else if (open?.state === "ACTIVE" && open.value !== value) {
+    upsert({ ...open, value, threshold });
   }
 
   return changed;
 }
 
 /**
- * Operator ack. If condition already cleared, move straight to CLEARED.
+ * Evaluate TEMP_HIGH + POWER_HIGH after each telemetry sample.
+ * Also treats the asset as online (caller should run evaluateOffline with age 0).
+ */
+export function evaluateTelemetry(
+  data: TelemetryPayload,
+  thresholds: Thresholds = resolvedThresholds(data.assetId),
+): AlarmRecord[] {
+  const changed: AlarmRecord[] = [];
+  const ts = data.ts || Date.now();
+  changed.push(
+    ...evaluateHigh(
+      data.assetId,
+      "TEMP_HIGH",
+      data.metrics.temperature,
+      thresholds.temperatureMaxC,
+      "CRITICAL",
+      ts,
+    ),
+  );
+  changed.push(
+    ...evaluateHigh(
+      data.assetId,
+      "POWER_HIGH",
+      data.metrics.power,
+      thresholds.powerMaxKw,
+      "WARNING",
+      ts,
+    ),
+  );
+  return changed;
+}
+
+/**
+ * OFFLINE timeout. `secondsSinceSeen` is 0 when a fresh sample just arrived.
+ */
+export function evaluateOffline(
+  assetId: string,
+  secondsSinceSeen: number,
+  timeoutSec: number = resolvedThresholds(assetId).offlineTimeoutSec,
+  now = Date.now(),
+): AlarmRecord[] {
+  const changed: AlarmRecord[] = [];
+  const open = findOpen(assetId, "OFFLINE");
+  const timedOut = secondsSinceSeen > timeoutSec;
+
+  if (timedOut) {
+    if (!open) {
+      const raised = raise(
+        assetId,
+        "OFFLINE",
+        secondsSinceSeen,
+        timeoutSec,
+        "WARNING",
+        now,
+      );
+      console.log(
+        `[realtime] alarm RAISE ${raised.alarmId} silent ${secondsSinceSeen.toFixed(0)}s > ${timeoutSec}s`,
+      );
+      changed.push(raised);
+    } else if (open.value !== secondsSinceSeen) {
+      upsert({ ...open, value: secondsSinceSeen, threshold: timeoutSec });
+    }
+    return changed;
+  }
+
+  if (open?.state === "ACKED") {
+    const cleared = upsert({
+      ...open,
+      state: "CLEARED",
+      value: secondsSinceSeen,
+      threshold: timeoutSec,
+      clearedAt: now,
+    });
+    console.log(`[realtime] alarm CLEAR ${cleared.alarmId}`);
+    changed.push(cleared);
+  } else if (open?.state === "ACTIVE") {
+    upsert({ ...open, value: secondsSinceSeen, threshold: timeoutSec });
+  }
+
+  return changed;
+}
+
+export type AckLatest = {
+  temperature?: number;
+  power?: number;
+  online?: boolean;
+};
+
+function conditionAlreadyClear(alarm: AlarmRecord, latest?: AckLatest): boolean {
+  if (alarm.rule === "TEMP_HIGH") {
+    return (
+      latest?.temperature !== undefined && latest.temperature <= alarm.threshold
+    );
+  }
+  if (alarm.rule === "POWER_HIGH") {
+    return latest?.power !== undefined && latest.power <= alarm.threshold;
+  }
+  if (alarm.rule === "OFFLINE") {
+    return latest?.online === true;
+  }
+  return false;
+}
+
+/**
+ * Operator ack. If the condition is already gone, move straight to CLEARED.
  */
 export function acknowledgeAlarm(
   alarmId: string,
   ackedBy: string,
-  latestTemp?: number,
+  latest?: AckLatest,
 ): AlarmRecord | { error: string } {
   const alarm = alarmsById.get(alarmId);
   if (!alarm) return { error: "not_found" };
   if (alarm.state !== "ACTIVE") return { error: "not_active" };
 
   const now = Date.now();
-  const below =
-    latestTemp !== undefined
-      ? latestTemp <= alarm.threshold
-      : false;
-
-  if (below) {
+  if (conditionAlreadyClear(alarm, latest)) {
     const cleared = upsert({
       ...alarm,
       state: "CLEARED",
-      value: latestTemp ?? alarm.value,
+      value:
+        alarm.rule === "TEMP_HIGH"
+          ? (latest?.temperature ?? alarm.value)
+          : alarm.rule === "POWER_HIGH"
+            ? (latest?.power ?? alarm.value)
+            : 0,
       ackedAt: now,
       ackedBy,
       clearedAt: now,

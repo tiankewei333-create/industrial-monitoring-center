@@ -5,6 +5,7 @@ import {
   listWorkOrders,
   updateWorkOrder,
 } from "../../api/workOrdersApi";
+import { PrimaryNav } from "../../layout/PrimaryNav";
 import { clearSession, getSession } from "../../auth/authStorage";
 import "./WorkOrdersPage.css";
 
@@ -92,17 +93,7 @@ export function WorkOrdersPage() {
           </p>
         </div>
         <div className="wo-right">
-          <nav className="wo-nav" aria-label="Primary">
-            <Link to="/live">Live panel</Link>
-            <Link to="/assets">Assets</Link>
-            <Link to="/alarms">Alarms</Link>
-            <span className="wo-nav-current" aria-current="page">
-              Work orders
-            </span>
-            <Link to="/history">History</Link>
-            <Link to="/kpi">KPI</Link>
-            <Link to="/twin">Twin</Link>
-          </nav>
+          <PrimaryNav ns="wo" current="work-orders" />
           {session ? (
             <div className="wo-user">
               <span>

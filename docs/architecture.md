@@ -4,21 +4,23 @@
 
 ```
 imc-simulator
-      │ MQTT publish  imc/telemetry/Machine001
+      │ MQTT publish  imc/telemetry/{8 workshop assets}
       ▼
-embedded Aedes (default) or external Mosquitto
+embedded Aedes (local) or Mosquitto with password (Compose)
       │ MQTT subscribe imc/telemetry/#
       ▼
-imc-realtime  ── WebSocket /ws ──► imc-web (/live … /history /kpi /twin)
+imc-realtime  ── WebSocket /ws ──► imc-web (/live … /twin /wall /settings)
       │              ▲
-      │              └── client: alarm_ack
-      ├── TEMP_HIGH rule engine
+      │              └── client: auth + alarm_ack (JWT)
+      ├── TEMP_HIGH / POWER_HIGH / OFFLINE rules
+      ├── thresholds from Postgres (poll ~5s)
       ├── history ring buffer (last ~15 min / asset)
-      ├── Postgres upsert (alarms + asset status) when DATABASE_URL set
+      ├── Postgres upsert (alarms + asset status + audit) when DATABASE_URL set
       ├── Timescale batch insert when TIMESCALE_URL set
-      └── GET /health  ·  GET /history (memory)
+      └── GET /health  ·  GET /history (memory)  ·  GET /metrics (Prometheus)
 
-imc-api ── REST /auth /assets /alarms /history /kpi ──► imc-web (via /api proxy)
+imc-api ── REST /auth /assets /alarms /history /kpi /energy /thresholds /audit /work-orders
+      ├── login rate limit + production JWT_SECRET check + CORS
       ├── Postgres (users, assets, alarms)
       └── Timescale (telemetry hypertable)
 ```

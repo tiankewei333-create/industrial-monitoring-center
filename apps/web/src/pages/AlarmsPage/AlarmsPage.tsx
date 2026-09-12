@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import type { AlarmRecord, AlarmState } from "@imc/shared-types";
+import { useNavigate } from "react-router-dom";
+import { formatAlarmValue, type AlarmRecord, type AlarmState } from "@imc/shared-types";
 import { createWorkOrder } from "../../api/workOrdersApi";
 import { clearSession, getSession } from "../../auth/authStorage";
+import { PrimaryNav } from "../../layout/PrimaryNav";
+import { downloadCsv } from "../../lib/csv";
 import { useRealtimeWs } from "../../realtime/useRealtimeWs";
 import "./AlarmsPage.css";
 
@@ -17,8 +19,15 @@ const STATE_OPTIONS: Array<AlarmState | "ALL" | "OPEN"> = [
 export function AlarmsPage() {
   const navigate = useNavigate();
   const session = getSession();
-  const { conn, mqttConnected, hello, alarms, activeCount, ackAlarm } =
-    useRealtimeWs();
+  const {
+    conn,
+    mqttConnected,
+    hello,
+    alarms,
+    activeCount,
+    ackAlarm,
+    ackError: wsAckError,
+  } = useRealtimeWs();
   const [stateFilter, setStateFilter] = useState<
     AlarmState | "ALL" | "OPEN"
   >("OPEN");
@@ -49,7 +58,7 @@ export function AlarmsPage() {
       setAckError("Observer cannot acknowledge alarms.");
       return;
     }
-    const ok = ackAlarm(alarmId, session.user.username);
+    const ok = ackAlarm(alarmId);
     if (!ok) setAckError("WebSocket not connected — cannot ack.");
   }
 
@@ -83,36 +92,11 @@ export function AlarmsPage() {
           <div className="alarms-brand">IMC</div>
           <h1>Alarm Center</h1>
           <p className="alarms-sub">
-            Workshop A · TEMP_HIGH closed loop → work orders
+            Workshop A · TEMP_HIGH / POWER_HIGH / OFFLINE → work orders
           </p>
         </div>
         <div className="alarms-right">
-          <nav className="alarms-nav" aria-label="Primary">
-            <Link to="/live">
-              Live panel
-              {activeCount > 0 ? (
-                <span
-                  className="alarms-nav-badge"
-                  aria-label={`${activeCount} active`}
-                >
-                  {activeCount}
-                </span>
-              ) : null}
-            </Link>
-            <Link to="/assets">Assets</Link>
-            <span className="alarms-nav-current" aria-current="page">
-              Alarms
-              {activeCount > 0 ? (
-                <span className="alarms-nav-badge" aria-hidden>
-                  {activeCount}
-                </span>
-              ) : null}
-            </span>
-            <Link to="/work-orders">Work orders</Link>
-            <Link to="/history">History</Link>
-            <Link to="/kpi">KPI</Link>
-            <Link to="/twin">Twin</Link>
-          </nav>
+          <PrimaryNav ns="alarms" current="alarms" activeCount={activeCount} />
           <div className="alarms-badges">
             <span className={`alarms-badge ${conn === "open" ? "ok" : "bad"}`}>
               WS {conn}
@@ -136,9 +120,14 @@ export function AlarmsPage() {
       </header>
 
       {hello ? <p className="alarms-meta">{hello}</p> : null}
-      {ackError ? (
+      {(ackError || wsAckError) ? (
         <p className="alarms-error" role="alert">
-          {ackError}
+          {ackError ||
+            (wsAckError === "forbidden"
+              ? "Observer cannot acknowledge alarms."
+              : wsAckError === "unauthorized"
+                ? "WebSocket auth required — sign in again."
+                : wsAckError)}
         </p>
       ) : null}
       {woMsg ? (
@@ -166,13 +155,36 @@ export function AlarmsPage() {
         <div className="alarms-count">
           {filtered.length} shown · {activeCount} ACTIVE
         </div>
+        <button
+          type="button"
+          className="alarms-ack"
+          disabled={filtered.length === 0}
+          onClick={() =>
+            downloadCsv("alarms.csv", [
+              ["alarmId", "assetId", "rule", "state", "value", "threshold", "raisedAt", "ackedBy"],
+              ...filtered.map((a) => [
+                a.alarmId,
+                a.assetId,
+                a.rule,
+                a.state,
+                a.value,
+                a.threshold,
+                new Date(a.raisedAt).toISOString(),
+                a.ackedBy ?? "",
+              ]),
+            ])
+          }
+        >
+          CSV
+        </button>
       </section>
 
       {filtered.length === 0 ? (
         <div className="alarms-empty">
           No alarms in this filter. Trigger over-temp with{" "}
-          <code>npm run dev:simulator:spike</code> or{" "}
-          <code>npm run dev:live:hot</code>.
+          <code>npm run dev:simulator:spike</code>, over-power with{" "}
+          <code>npm run dev:simulator:power</code>, or stop the simulator for
+          OFFLINE.
         </div>
       ) : (
         <div className="alarms-table-wrap">
@@ -208,8 +220,10 @@ export function AlarmsPage() {
                     <code>{a.assetId}</code>
                   </td>
                   <td>{a.rule}</td>
-                  <td className="alarms-num">{a.value.toFixed(1)} °C</td>
-                  <td className="alarms-num">{a.threshold} °C</td>
+                  <td className="alarms-num">{formatAlarmValue(a.rule, a.value)}</td>
+                  <td className="alarms-num">
+                    {formatAlarmValue(a.rule, a.threshold)}
+                  </td>
                   <td className="alarms-ts">
                     {new Date(a.raisedAt).toLocaleString()}
                   </td>

@@ -8,6 +8,8 @@ import { LoginPage } from "./pages/LoginPage/LoginPage";
 import { KpiPage } from "./pages/KpiPage/KpiPage";
 import { WorkOrdersPage } from "./pages/WorkOrdersPage/WorkOrdersPage";
 import { TwinPage } from "./pages/TwinPage/TwinPage";
+import { WallPage } from "./pages/WallPage/WallPage";
+import { SettingsPage } from "./pages/SettingsPage/SettingsPage";
 
 export function App() {
   return (
@@ -66,6 +68,22 @@ export function App() {
         element={
           <RequireAuth>
             <TwinPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/wall"
+        element={
+          <RequireAuth>
+            <WallPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <RequireAuth>
+            <SettingsPage />
           </RequireAuth>
         }
       />

@@ -19,14 +19,20 @@ Status enum: `OFFLINE` | `IDLE` | `RUNNING` | `FAULT`
 
 TypeScript source of truth: `packages/shared-types/src/index.ts`
 
-## Alarms (MVP)
+## Alarms
 
-Raised by `imc-realtime` when `metrics.temperature > DEFAULT_THRESHOLDS.temperatureMaxC` (80).
+Raised by `imc-realtime`:
+
+- `TEMP_HIGH` when `metrics.temperature` > configured `temperatureMaxC` (default 80)
+- `POWER_HIGH` when `metrics.power` > configured `powerMaxKw` (default 15)
+- `OFFLINE` when no telemetry for `offlineTimeoutSec` (default 30)
+
+Thresholds live in Postgres (`app_settings.thresholds` + optional per-asset columns). Realtime reloads them every 5s.
 
 State machine: `ACTIVE` → `ACKED` → `CLEARED`
 
 - Same `assetId` + `rule` cannot raise again while `ACTIVE` or `ACKED`.
-- Clear only after `ACKED` and temperature is back `<=` threshold (or Ack while already below → `CLEARED`).
+- Clear only after `ACKED` and the condition is gone (or Ack while already clear → `CLEARED`).
 
 Example `AlarmRecord`:
 
@@ -48,6 +54,8 @@ WebSocket (server → client):
 - `alarm` — single alarm change
 - `alarms_snapshot` — full in-memory list on connect
 - `history_snapshot` — ring-buffer series on connect (`HistorySeries[]`)
+- `auth_ok` / `auth_error` — after client `auth`
+- `ack_error` — Ack rejected (unauthorized / forbidden / not_active)
 
 HTTP (realtime, debug):
 
@@ -56,7 +64,21 @@ HTTP (realtime, debug):
 
 WebSocket (client → server):
 
-- `alarm_ack` — `{ "type": "alarm_ack", "alarmId": "...", "ackedBy": "operator" }`
+- `auth` — `{ "type": "auth", "token": "<JWT>" }` (required before Ack; identity comes from the token, not the client)
+- `alarm_ack` — `{ "type": "alarm_ack", "alarmId": "..." }`
+
+REST (api):
+
+- `GET /thresholds` · `PUT /thresholds` (admin)
+- `PUT /assets/:assetId/thresholds` (admin; `null` inherits global)
+- `GET /audit` (authenticated)
+- `GET /energy?from=&to=` — estimated kWh from Timescale `avg(power) × duration`
+
+## MQTT auth (Compose MVP)
+
+Mosquitto is started with `allow_anonymous false`. Set `MQTT_USER` / `MQTT_PASSWORD` (see `.env.example`). Local `dev:live` still uses embedded Aedes (anonymous) unless `IMC_EMBED_MQTT=false`.
+
+Realtime `GET /metrics` is Prometheus text (`imc_mqtt_messages_total`, `imc_ws_clients`, `imc_open_alarms`, `imc_assets_seen`).
 
 ## History (MVP)
 
@@ -64,6 +86,8 @@ In-memory ring buffer in `imc-realtime` (default 900 points ≈ 15 min at 1 Hz).
 When `TIMESCALE_URL` is set, realtime also batch-inserts into Timescale `telemetry`.
 Longer windows: `GET /api/history?assetId=&from=&to=` (downsampled via `time_bucket`).
 KPI: `GET /api/kpi?from=&to=` (availability = RUNNING sample share).
+Energy: `GET /api/energy?from=&to=` (`avg(power_kW) × hours`).
+Retention: 30 days.
 
 Example `HistorySample`:
 

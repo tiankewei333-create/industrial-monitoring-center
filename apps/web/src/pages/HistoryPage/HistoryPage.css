@@ -219,6 +219,29 @@
   align-items: center;
 }
 
+.history-play {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.history-play input[type="range"] {
+  flex: 1;
+}
+
+.history-play button,
+.history-csv {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
 .history-chart-wrap {
   margin-top: 16px;
   border: 1px solid var(--line);

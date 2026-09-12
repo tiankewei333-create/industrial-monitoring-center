@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import type { KpiOverview } from "@imc/shared-types";
-import { fetchKpi, type HistoryRangeHours } from "../../api/historyApi";
+import { useNavigate } from "react-router-dom";
+import type { EnergyOverview, KpiOverview } from "@imc/shared-types";
+import { fetchEnergy, fetchKpi, type HistoryRangeHours } from "../../api/historyApi";
 import { clearSession, getSession } from "../../auth/authStorage";
+import { PrimaryNav } from "../../layout/PrimaryNav";
+import { downloadCsv } from "../../lib/csv";
 import "./KpiPage.css";
 
 const RANGES: HistoryRangeHours[] = [1, 6, 24];
@@ -16,6 +18,7 @@ export function KpiPage() {
   const session = getSession();
   const [hours, setHours] = useState<HistoryRangeHours>(24);
   const [kpi, setKpi] = useState<KpiOverview | null>(null);
+  const [energy, setEnergy] = useState<EnergyOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -23,13 +26,20 @@ export function KpiPage() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetchKpi(hours)
-      .then((data) => {
-        if (!cancelled) setKpi(data);
+    Promise.all([
+      fetchKpi(hours),
+      fetchEnergy(hours).catch(() => null),
+    ])
+      .then(([k, e]) => {
+        if (!cancelled) {
+          setKpi(k);
+          setEnergy(e);
+        }
       })
       .catch((err) => {
         if (!cancelled) {
           setKpi(null);
+          setEnergy(null);
           setError(err instanceof Error ? err.message : "kpi_failed");
         }
       })
@@ -51,23 +61,13 @@ export function KpiPage() {
       <header className="kpi-top">
         <div>
           <div className="kpi-brand">IMC</div>
-          <h1>KPI / Availability</h1>
+          <h1>KPI / Energy</h1>
           <p className="kpi-sub">
-            Workshop A · RUNNING share from Timescale telemetry
+            Workshop A · availability + estimated kWh from Timescale power
           </p>
         </div>
         <div className="kpi-right">
-          <nav className="kpi-nav" aria-label="Primary">
-            <Link to="/live">Live panel</Link>
-            <Link to="/assets">Assets</Link>
-            <Link to="/alarms">Alarms</Link>
-            <Link to="/work-orders">Work orders</Link>
-            <Link to="/history">History</Link>
-            <span className="kpi-nav-current" aria-current="page">
-              KPI
-            </span>
-            <Link to="/twin">Twin</Link>
-          </nav>
+          <PrimaryNav ns="kpi" current="kpi" />
           {session ? (
             <div className="kpi-user">
               <span>
@@ -140,7 +140,36 @@ export function KpiPage() {
               <span className="kpi-stat-label">Samples</span>
               <strong>{kpi.sampleCount.toLocaleString()}</strong>
             </div>
+            {energy ? (
+              <div className="kpi-stat">
+                <span className="kpi-stat-label">Energy (est.)</span>
+                <strong>{energy.totalKwh.toFixed(1)} kWh</strong>
+              </div>
+            ) : null}
           </section>
+
+          <p>
+            <button
+              type="button"
+              className="kpi-csv"
+              onClick={() =>
+                downloadCsv(`kpi-${hours}h.csv`, [
+                  ["assetId", "availability", "faultRatio", "avgC", "avgKw", "samples", "energyKwh"],
+                  ...kpi.assets.map((a) => [
+                    a.assetId,
+                    a.availability.toFixed(4),
+                    a.faultRatio.toFixed(4),
+                    a.avgTemperature ?? "",
+                    a.avgPower ?? "",
+                    a.samples,
+                    energy?.assets.find((e) => e.assetId === a.assetId)?.energyKwh.toFixed(3) ?? "",
+                  ]),
+                ])
+              }
+            >
+              Export CSV
+            </button>
+          </p>
 
           <div className="kpi-table-wrap">
             <table className="kpi-table">
@@ -151,6 +180,7 @@ export function KpiPage() {
                   <th>Fault</th>
                   <th>Avg °C</th>
                   <th>Avg kW</th>
+                  <th>Est. kWh</th>
                   <th>Samples</th>
                 </tr>
               </thead>
@@ -177,6 +207,14 @@ export function KpiPage() {
                     </td>
                     <td>
                       {a.avgPower != null ? a.avgPower.toFixed(2) : "—"}
+                    </td>
+                    <td>
+                      {(() => {
+                        const kwh = energy?.assets.find(
+                          (row) => row.assetId === a.assetId,
+                        )?.energyKwh;
+                        return kwh != null ? kwh.toFixed(2) : "—";
+                      })()}
                     </td>
                     <td>{a.samples.toLocaleString()}</td>
                   </tr>

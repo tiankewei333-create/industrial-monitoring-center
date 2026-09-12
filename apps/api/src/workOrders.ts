@@ -1,11 +1,14 @@
 import type { FastifyInstance } from "fastify";
 import type { Pool } from "pg";
-import type {
-  WorkOrderPriority,
-  WorkOrderRecord,
-  WorkOrderStatus,
+import {
+  formatAlarmValue,
+  type AlarmRule,
+  type WorkOrderPriority,
+  type WorkOrderRecord,
+  type WorkOrderStatus,
 } from "@imc/shared-types";
 import { requireStaff } from "./auth.js";
+import { writeAudit } from "./audit.js";
 
 type WorkOrderRow = {
   work_order_id: string;
@@ -122,7 +125,7 @@ export function registerWorkOrderRoutes(app: FastifyInstance, pool: Pool) {
         alarmId = requestedAlarmId;
         assetId = assetId || alarm.rows[0].asset_id;
         if (!title) {
-          title = `${alarm.rows[0].rule} on ${alarm.rows[0].asset_id} (${Number(alarm.rows[0].value).toFixed(1)}°C)`;
+          title = `${alarm.rows[0].rule} on ${alarm.rows[0].asset_id} (${formatAlarmValue(alarm.rows[0].rule as AlarmRule, Number(alarm.rows[0].value))})`;
         }
         const dup = await pool.query<{ work_order_id: string }>(
           `SELECT work_order_id FROM work_orders WHERE alarm_id = $1`,
@@ -178,6 +181,14 @@ export function registerWorkOrderRoutes(app: FastifyInstance, pool: Pool) {
           note,
         ],
       );
+      await writeAudit(pool, {
+        actor: auth.user.username,
+        role: auth.user.role,
+        action: "work_order_create",
+        entityType: "work_order",
+        entityId: id,
+        detail: { assetId, alarmId, priority },
+      });
       return reply.code(201).send({ workOrder: mapWo(r.rows[0]) });
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code;
@@ -260,6 +271,14 @@ export function registerWorkOrderRoutes(app: FastifyInstance, pool: Pool) {
     if (!r.rows[0]) {
       return reply.code(404).send({ error: "not_found" });
     }
+    await writeAudit(pool, {
+      actor: auth.user.username,
+      role: auth.user.role,
+      action: "work_order_update",
+      entityType: "work_order",
+      entityId: req.params.workOrderId,
+      detail: req.body as Record<string, unknown>,
+    });
     return { workOrder: mapWo(r.rows[0]) };
   });
 }

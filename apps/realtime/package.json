@@ -10,13 +10,14 @@
     "build": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "echo \"[imc-realtime] lint ok\" && exit 0",
-    "test": "echo \"[imc-realtime] no tests yet\" && exit 0"
+    "test": "tsx --test src/alarms.test.ts"
   },
   "dependencies": {
     "@imc/shared-types": "0.1.0",
     "aedes": "^0.51.3",
     "mqtt": "^5.10.4",
     "pg": "^8.14.1",
+    "jose": "^6.2.12",
     "ws": "^8.18.1"
   },
   "devDependencies": {

@@ -1,5 +1,5 @@
 import { API_URL } from "../auth/authApi";
-import type { HistorySample, KpiOverview } from "@imc/shared-types";
+import type { EnergyOverview, HistorySample, KpiOverview } from "@imc/shared-types";
 
 export type HistoryRangeHours = 1 | 6 | 24;
 
@@ -44,4 +44,19 @@ export async function fetchKpi(hours: HistoryRangeHours): Promise<KpiOverview> {
     throw new Error(body?.error ?? `kpi_failed_${res.status}`);
   }
   return (await res.json()) as KpiOverview;
+}
+
+export async function fetchEnergy(hours: HistoryRangeHours): Promise<EnergyOverview> {
+  const to = new Date();
+  const from = new Date(to.getTime() - hours * 3600_000);
+  const qs = new URLSearchParams({
+    from: from.toISOString(),
+    to: to.toISOString(),
+  });
+  const res = await fetch(`${API_URL}/energy?${qs}`);
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? `energy_failed_${res.status}`);
+  }
+  return (await res.json()) as EnergyOverview;
 }

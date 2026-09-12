@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { HISTORY_DEFAULTS, type AlarmRecord, type HistorySample, type HistorySeries, type TelemetryPayload, type WsClientMessage, type WsServerMessage } from "@imc/shared-types";
+import { getSession } from "../auth/authStorage";
 
 export type ConnState = "connecting" | "open" | "closed";
 
@@ -18,6 +19,8 @@ export function useRealtimeWs() {
   const [assets, setAssets] = useState<Record<string, TelemetryPayload>>({});
   const [alarmsById, setAlarmsById] = useState<Record<string, AlarmRecord>>({});
   const [historyByAsset, setHistoryByAsset] = useState<Record<string, HistorySample[]>>({});
+  const [wsAuth, setWsAuth] = useState<"pending" | "ok" | "error">("pending");
+  const [ackError, setAckError] = useState("");
   const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
@@ -27,12 +30,17 @@ export function useRealtimeWs() {
 
     const connect = () => {
       setConn("connecting");
+      setWsAuth("pending");
       ws = new WebSocket(WS_URL);
       wsRef.current = ws;
 
       ws.onopen = () => {
         if (disposed) return;
         setConn("open");
+        const token = getSession()?.token;
+        if (token) {
+          ws?.send(JSON.stringify({ type: "auth", token } satisfies WsClientMessage));
+        }
       };
 
       ws.onclose = () => {
@@ -85,6 +93,12 @@ export function useRealtimeWs() {
           setAlarmsById((prev) => ({ ...prev, [msg.data.alarmId]: msg.data }));
         } else if (msg.type === "history_snapshot") {
           setHistoryByAsset(seriesToMap(msg.series));
+        } else if (msg.type === "auth_ok") {
+          setWsAuth("ok");
+        } else if (msg.type === "auth_error") {
+          setWsAuth("error");
+        } else if (msg.type === "ack_error") {
+          setAckError(msg.error);
         }
       };
     };
@@ -117,8 +131,9 @@ export function useRealtimeWs() {
     return true;
   }
 
-  function ackAlarm(alarmId: string, ackedBy: string) {
-    return send({ type: "alarm_ack", alarmId, ackedBy });
+  function ackAlarm(alarmId: string) {
+    setAckError("");
+    return send({ type: "alarm_ack", alarmId });
   }
 
   return {
@@ -130,6 +145,8 @@ export function useRealtimeWs() {
     activeCount,
     historyByAsset,
     ackAlarm,
+    wsAuth,
+    ackError,
   };
 }
 

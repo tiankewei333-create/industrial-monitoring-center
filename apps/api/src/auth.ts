@@ -35,6 +35,10 @@ export async function requireRoles(
   return { ok: true as const, user };
 }
 
+export function requireUser(authHeader: string | undefined) {
+  return requireRoles(authHeader, ["observer", "operator", "admin"]);
+}
+
 export function requireAdmin(authHeader: string | undefined) {
   return requireRoles(authHeader, ["admin"]);
 }

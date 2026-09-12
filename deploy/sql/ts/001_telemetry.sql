@@ -17,5 +17,5 @@ SELECT create_hypertable('telemetry', 'ts', if_not_exists => TRUE);
 CREATE INDEX IF NOT EXISTS telemetry_asset_ts_idx
   ON telemetry (asset_id, ts DESC);
 
--- Keep ~7 days of high-res samples (MVP)
-SELECT add_retention_policy('telemetry', INTERVAL '7 days', if_not_exists => TRUE);
+-- Keep ~30 days of high-res samples (see 002_retention_30d.sql on existing DBs)
+SELECT add_retention_policy('telemetry', INTERVAL '30 days', if_not_exists => TRUE);

@@ -63,7 +63,7 @@ You should see:
 
 1. Login page → use mock accounts below
 2. Live panel with **WS open** / **MQTT live**
-3. `Machine001` metrics updating about once per second
+3. **Eight** workshop assets updating about once per second (`SIM_FLEET=all`)
 
 ### Mock accounts
 
@@ -82,17 +82,25 @@ You should see:
 - [ ] Stopping the simulator stops UI updates (real pipeline, not fake frontend refresh)
 - [ ] `GET http://127.0.0.1:3002/health` returns `"ok": true` (includes `openAlarms`)
 - [ ] Unauthenticated `/live` redirects to `/login`
-- [ ] `/assets` shows mock registry (≥ 5 assets) and links back to Live
+- [ ] `/assets` shows the workshop registry (8 seeded assets) and links back to Live
 
-**Alarm closed loop (in-memory MVP)**
+**Alarm closed loop**
 
-- [ ] Start with spike/hot simulator (see below)
-- [ ] `/alarms` shows `TEMP_HIGH` in `ACTIVE`
+- [ ] Start with spike/hot/power simulator (see below)
+- [ ] `/alarms` shows `TEMP_HIGH` in `ACTIVE` (or `POWER_HIGH` with power mode)
 - [ ] Live panel shows ACTIVE badge / red count linking to `/alarms`
-- [ ] Login as `operator` → **Ack** → state becomes `ACKED`
-- [ ] After temperature ≤ 80°C → state becomes `CLEARED`
-- [ ] Login as `observer` → Ack button disabled / rejected
-- [ ] Restarting `realtime` clears in-memory alarms (expected until Postgres)
+- [ ] Login as `operator` → **Ack** → state becomes `ACKED` (WS must be authenticated)
+- [ ] After temperature ≤ threshold → state becomes `CLEARED`
+- [ ] Login as `observer` → Ack button disabled / rejected by realtime
+- [ ] Stop the simulator → after offline timeout the asset goes `OFFLINE` and an `OFFLINE` alarm raises
+- [ ] Restarting `realtime` hydrates open alarms from Postgres (when `DATABASE_URL` is set)
+
+**Settings + audit**
+
+- [ ] `/settings` shows global temperature / power / offline thresholds
+- [ ] Login as `admin` → change a threshold → realtime uses the new value within ~5s
+- [ ] Ack / asset / work-order actions appear in the audit table
+- [ ] `npm run db:backup` writes SQL dumps under `backups/` when Compose Postgres is up
 
 **History + Timescale**
 
@@ -102,10 +110,12 @@ You should see:
 - [ ] `GET http://127.0.0.1:3002/health` shows `"timescale": true` when configured
 - [ ] Restarting `realtime` clears the ring buffer; Timescale data remains
 
-**KPI**
+**KPI / energy / wall / 2D**
 
-- [ ] Open `/kpi` — workshop availability + per-asset table
-- [ ] `GET http://127.0.0.1:3001/kpi` returns `availability` / `assets`
+- [ ] Open `/kpi` — workshop availability + estimated kWh + CSV export
+- [ ] `GET http://127.0.0.1:3001/kpi` and `GET http://127.0.0.1:3001/energy` return Timescale aggregates
+- [ ] `/twin` toggles **3D / 2D floor**; `/wall` is the shift wallboard
+- [ ] `/history` Play/Pause scrubber + CSV; `/alarms` CSV export
 
 **3D twin (R3F + glTF + heat shader)**
 
@@ -122,6 +132,8 @@ You should see:
 - [ ] http://127.0.0.1:3001/health returns `"db": true` and `"timescale": true`
 - [ ] http://127.0.0.1:3002/health returns `"postgres": true` and `"timescale": true`
 - [ ] After alarm raise, row exists in `alarms`; realtime restart still shows open alarms
+- [ ] Mosquitto rejects anonymous MQTT (`allow_anonymous false`); realtime/simulator use `MQTT_USER` / `MQTT_PASSWORD`
+- [ ] `GET http://127.0.0.1:3002/metrics` returns Prometheus text (`imc_ws_clients`, `imc_open_alarms`)
 
 ### Alarm demo (manual script)
 
@@ -131,6 +143,9 @@ npm run dev:live:spike
 
 # Option B — hold over-temp
 npm run dev:live:hot
+
+# Option C — hold over-power (POWER_HIGH)
+npm run dev:live:power
 ```
 
 1. Open http://127.0.0.1:3000/login → `operator` / `operator123`
@@ -140,7 +155,7 @@ npm run dev:live:hot
 5. Wait for cool phase (spike mode) or stop hot mode → `CLEARED`
 6. Sign out → login `observer` / `observer123` → Ack disabled
 
-Out of scope this milestone: Postgres persistence, work orders, OFFLINE timeout alarms, 3D highlight.
+Out of scope this milestone: MQTT TLS, HTTPS reverse proxy, HA, OPC-UA, IEC 62443. See runbook “Plant hardening”.
 
 ## 3. Separate processes
 
@@ -149,11 +164,13 @@ npm run dev:realtime    # :3002 WS + optional embedded MQTT :1883
 npm run dev:simulator   # publishes Machine001
 npm run dev:simulator:hot    # hold T=86°C (force alarm)
 npm run dev:simulator:spike  # 15s hot / 20s cool cycle
+npm run dev:simulator:power  # hold P=16.5 kW (POWER_HIGH)
 npm run dev:live:spike       # full stack with spike cycle
+npm run dev:live:power       # full stack with over-power
 npm run dev:web         # :3000
 ```
 
-Alarm demo env vars (optional; see `.env.example`): `SIM_FORCE_TEMP`, `SIM_SPIKE`, `SIM_SPIKE_SEC`, `SIM_COOL_SEC`.
+Alarm demo env vars (optional; see `.env.example`): `SIM_FORCE_TEMP`, `SIM_FORCE_POWER`, `SIM_SPIKE`, `SIM_SPIKE_SEC`, `SIM_COOL_SEC`.
 
 Use Compose Mosquitto instead of embedded broker:
 
@@ -166,15 +183,17 @@ In `.env`:
 ```env
 IMC_EMBED_MQTT=false
 MQTT_URL=mqtt://127.0.0.1:1883
+MQTT_USER=imc
+MQTT_PASSWORD=imc_mqtt_password
 ```
 
 ## 4. Repository layout
 
 ```
-apps/web            Login + live + assets + alarms + history + kpi + twin (React + R3F)
-apps/realtime       MQTT → WebSocket bridge + TEMP_HIGH rules (in-memory)
-apps/simulator      Fake device publisher (drift / hot / spike modes)
-apps/api            Business API (not initialized yet)
+apps/web            Login + live + assets + alarms + history + kpi + twin + wall + settings
+apps/realtime       MQTT → WS bridge + TEMP/POWER/OFFLINE rules + JWT ack
+apps/simulator      Workshop fleet publisher (8 assets; drift / hot / spike / power)
+apps/api            Fastify REST (auth, assets, alarms, WO, history, KPI, energy, thresholds, audit)
 apps/ingest         Dedicated ingest (placeholder; MVP uses realtime)
 packages/shared-types   Protocol types
 deploy/             Docker Compose skeleton

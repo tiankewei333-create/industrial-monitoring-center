@@ -82,7 +82,22 @@ npm run dev:live:hot     # hold T=86°C
 4. Ack → `ACKED`; after cool phase → `CLEARED`
 5. Confirm `observer` cannot Ack
 
-Alarms are persisted in Postgres when `DATABASE_URL` is set. Live history ring buffer still clears on realtime restart; Timescale retains telemetry (~7 days).
+Alarms are persisted in Postgres when `DATABASE_URL` is set. Live history ring buffer still clears on realtime restart; Timescale retains telemetry (~30 days).
+
+Thresholds and audit: http://localhost:3000/settings (admin can edit thresholds).
+
+## Backup / restore
+
+```bash
+npm run db:backup
+```
+
+Writes `backups/imc-postgres-*.sql` and `backups/imc-timescale-*.sql` via `docker exec … pg_dump`. Restore:
+
+```bash
+docker exec -i imc-postgres psql -U imc -d imc < backups/imc-postgres-<stamp>.sql
+docker exec -i imc-timescale psql -U imc -d imc_ts < backups/imc-timescale-<stamp>.sql
+```
 
 ## History curves
 
@@ -90,16 +105,41 @@ Alarms are persisted in Postgres when `DATABASE_URL` is set. Live history ring b
 - API: `GET http://localhost:3001/history?assetId=Machine001&from=…&to=…`
 - Memory debug: `GET http://localhost:3002/history?assetId=Machine001`
 
-## KPI
+## KPI / energy
 
 - UI: http://localhost:3000/kpi
 - API: `GET http://localhost:3001/kpi?from=…&to=…`
+- Energy: `GET http://localhost:3001/energy?from=…&to=…` (estimated kWh)
 
-## Twin
+## Twin / wallboard
 
-- UI: http://localhost:3000/twin
+- Twin: http://localhost:3000/twin (3D / 2D toggle)
+- Wall: http://localhost:3000/wall
 - Models: `apps/web/public/models/*.glb` (`npm run models:twin`)
 
-## Backup / restore
+## MQTT credentials (Compose)
 
-TODO (Q3): Postgres dump / restore scripts.
+Compose Mosquitto generates a password file from `MQTT_USER` / `MQTT_PASSWORD` and sets `allow_anonymous false`. Realtime, simulator, and ingest receive the same env.
+
+Local `npm run dev:live` uses embedded Aedes (no password). To point host processes at Compose Mosquitto:
+
+```env
+IMC_EMBED_MQTT=false
+MQTT_URL=mqtt://127.0.0.1:1883
+MQTT_USER=imc
+MQTT_PASSWORD=imc_mqtt_password
+```
+
+Anonymous `mosquitto_sub` against Compose MQTT should fail.
+
+## Metrics
+
+- `GET http://localhost:3002/metrics` (Prometheus text)
+- Docker web: `GET http://127.0.0.1:3000/realtime-metrics`
+
+Login is rate-limited (20 attempts / IP / minute → HTTP 429). Production API refuses the default `JWT_SECRET` unless `IMC_ALLOW_DEFAULT_JWT=true` (lab only).
+
+## Plant hardening (unattended line — not in this repo)
+
+This stack is a **lab / small-workshop B tier**. Unattended plant software additionally needs: MQTT+HTTPS TLS, no default passwords, HA Postgres/MQTT, 72h soak, real PLC/OPC-UA ingest, backup restore drills, IEC 62443 / ISA-18.2 process, on-call + log shipping, change control. See the project README out-of-scope note.
+

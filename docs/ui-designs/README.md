@@ -14,13 +14,3 @@ Engineering-oriented dark industrial console (Year 1 target, not cinematic holog
 | 08 | Wallboard | [imc-ui-08-wallboard.png](./imc-ui-08-wallboard.png) | Projection mode |
 
 Business flows: [../business-logic.md](../business-logic.md)
-
-## DCIM / cloud twin (portfolio target)
-
-Same console language, different domain: IDC hall, racks, PUE — closer to 3D visualization architect JDs than the CNC workshop.
-
-| # | Screen | File | Domain |
-|---|---|---|---|
-| D1 | IDC 3D overview | [dcim-ui-01-twin-overview.png](./dcim-ui-01-twin-overview.png) | Hall twin / rack select |
-| D2 | Rack detail | [dcim-ui-02-rack-detail.png](./dcim-ui-02-rack-detail.png) | Inlet / power / WO |
-| D3 | Campus wallboard | [dcim-ui-03-wallboard.png](./dcim-ui-03-wallboard.png) | PUE / multi-hall alarm |

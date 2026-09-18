@@ -92,10 +92,12 @@ You should see:
 
 | Preview | |
 |---|---|
-| Twin overview (design target) | ![Twin overview](docs/ui-designs/dcim-ui-01-twin-overview.png) |
-| Wallboard (design target) | ![Wallboard](docs/ui-designs/dcim-ui-03-wallboard.png) |
+| Twin overview (design target) | ![Twin overview](docs/ui-designs/imc-ui-02-twin-overview.png) |
+| Alarm center (design target) | ![Alarm center](docs/ui-designs/imc-ui-04-alarm-center.png) |
+| Wallboard (design target) | ![Wallboard](docs/ui-designs/imc-ui-08-wallboard.png) |
 
-Live product captures: add files under [`docs/screenshots/`](docs/screenshots/) (see that folder’s README), then link them here.
+More mockups: [`docs/ui-designs/`](docs/ui-designs/).  
+Live product captures: add files under [`docs/screenshots/`](docs/screenshots/), then link them here.
 
 ### Acceptance checklist
 

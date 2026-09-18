@@ -15,6 +15,9 @@ Thumbs.db
 .cache/
 backups/
 temp/
+# Keep personal study notes / career plans out of the public tree
+docs/zh/
+docs/career-roadmap/
 assets/models/*.glb
 assets/models/*.gltf
 !assets/models/.gitkeep

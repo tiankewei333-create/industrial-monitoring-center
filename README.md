@@ -3,11 +3,12 @@
 Single-workshop industrial monitoring digital twin:
 **ingest → store → push → 3D / alarms**.
 
+Public MVP showcase: a runnable pipeline (not a fake frontend animation) with live telemetry, alarm closed loop, history/KPI, and a 3D workshop twin.
+
 ## Language policy
 
 - **Canonical language for this repository: English**
-  (README, code comments, commit messages, CI, `docs/*.md` except `docs/zh/`).
-- Chinese notes for personal study live under [`docs/zh/`](docs/zh/).
+  (README, code comments, commit messages, CI, `docs/*.md`).
 - User-facing UI copy is English-first (i18n keys may be added later).
 
 ## Current MVP data path
@@ -28,7 +29,6 @@ imc-simulator ──MQTT──► (embedded Aedes / Mosquitto) ──MQTT──�
 ### A. Local (Node)
 
 ```bash
-cd D:\projects\industrial-monitoring-center
 cp .env.example .env
 npm install
 npm run dev:live
@@ -197,8 +197,7 @@ apps/api            Fastify REST (auth, assets, alarms, WO, history, KPI, energy
 apps/ingest         Dedicated ingest (placeholder; MVP uses realtime)
 packages/shared-types   Protocol types
 deploy/             Docker Compose skeleton
-docs/               English project docs
-docs/zh/            Personal Chinese notes (non-canonical)
+docs/               Project docs (architecture, protocol, runbook, UI designs)
 ```
 
 ## 5. Protocol
@@ -210,8 +209,6 @@ See [docs/protocol.md](docs/protocol.md) and `packages/shared-types/src/index.ts
 1. [docs/business-logic.md](docs/business-logic.md) — business flows (start here)
 2. [docs/architecture.md](docs/architecture.md) · [docs/protocol.md](docs/protocol.md) · [docs/runbook.md](docs/runbook.md)
 3. [docs/ui-designs/](docs/ui-designs/) — IMC UI mockups
-4. [docs/career-roadmap/](docs/career-roadmap/) — 24-month career roadmap Excel + portfolio UI
-5. [docs/zh/](docs/zh/) — Chinese personal reference only
 
 ## 7. Year 1 freezes
 

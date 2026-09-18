@@ -2,13 +2,8 @@
 
 ## Canonical
 
-- **English** for README, code comments, CI YAML comments, commit messages, and all docs under `docs/` except `docs/zh/`.
+- **English** for README, code comments, CI YAML comments, commit messages, and docs under `docs/`.
 - Prefer Conventional Commits in English (`feat:`, `fix:`, `docs:`, …).
-
-## Personal / non-canonical
-
-- Chinese study notes may live under `docs/zh/` with a `.zh.md` suffix.
-- Do not treat `docs/zh/` as the source of truth for implementation.
 
 ## UI copy
 

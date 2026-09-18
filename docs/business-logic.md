@@ -1,7 +1,6 @@
 # IMC Business Logic
 
 > Goal: explain what the system does with one overview diagram and a few flows.  
-> Personal Chinese notes: [zh/business-logic.zh.md](./zh/business-logic.zh.md)  
 > UI targets: [ui-designs/](./ui-designs/)
 
 ---

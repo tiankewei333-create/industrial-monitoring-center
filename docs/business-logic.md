@@ -1,7 +1,7 @@
 # IMC Business Logic
 
 > Goal: explain what the system does with one overview diagram and a few flows.  
-> UI targets: [ui-designs/](./ui-designs/)
+> Demo talk track: [demo.md](./demo.md) · Live captures: [screenshots/](./screenshots/)
 
 ---
 

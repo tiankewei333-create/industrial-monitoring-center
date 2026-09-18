@@ -90,14 +90,7 @@ You should see:
 
 ### Screenshots
 
-| Preview | |
-|---|---|
-| Twin overview (design target) | ![Twin overview](docs/ui-designs/imc-ui-02-twin-overview.png) |
-| Alarm center (design target) | ![Alarm center](docs/ui-designs/imc-ui-04-alarm-center.png) |
-| Wallboard (design target) | ![Wallboard](docs/ui-designs/imc-ui-08-wallboard.png) |
-
-More mockups: [`docs/ui-designs/`](docs/ui-designs/).  
-Live product captures: add files under [`docs/screenshots/`](docs/screenshots/), then link them here.
+Add live product captures under [`docs/screenshots/`](docs/screenshots/) (see that folder’s README), then link them here. Prefer real running UI over concept art.
 
 ### Acceptance checklist
 
@@ -237,8 +230,7 @@ See [docs/protocol.md](docs/protocol.md) and `packages/shared-types/src/index.ts
 1. [docs/demo.md](docs/demo.md) — showcase talk track (start here for demos)
 2. [docs/business-logic.md](docs/business-logic.md) — business flows
 3. [docs/architecture.md](docs/architecture.md) · [docs/protocol.md](docs/protocol.md) · [docs/runbook.md](docs/runbook.md)
-4. [docs/ui-designs/](docs/ui-designs/) — IMC UI mockups
-5. [docs/screenshots/](docs/screenshots/) — live product captures (add your PNGs)
+4. [docs/screenshots/](docs/screenshots/) — live product captures (add your PNGs)
 
 ## 7. Year 1 freezes
 

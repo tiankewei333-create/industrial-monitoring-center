@@ -12,4 +12,4 @@ Suggested filenames:
 | `04-twin.png` | 3D workshop twin |
 | `05-history-kpi.png` | History or KPI view |
 
-Until live captures are added, the README links UI design targets under [`../ui-designs/`](../ui-designs/).
+Capture from a real running stack (`npm run dev:live:spike` or `npm run docker:mvp`), not concept art.

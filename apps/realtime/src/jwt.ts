@@ -22,9 +22,15 @@ function titleCase(name: string) {
   return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
-/** Local `dev:live` mock tokens: `mock.{role}.{ts}` — never in production. */
+/**
+ * Local `dev:live` mock tokens: `mock.{role}.{ts}`.
+ * Disabled in production unless `IMC_ALLOW_MOCK_AUTH=true` (lab only).
+ */
 export function parseMockToken(token: string): AccessTokenClaims | null {
-  if (process.env.NODE_ENV === "production") return null;
+  const allowMock =
+    process.env.NODE_ENV !== "production" ||
+    process.env.IMC_ALLOW_MOCK_AUTH === "true";
+  if (!allowMock) return null;
   const parts = token.split(".");
   if (parts.length !== 3 || parts[0] !== "mock") return null;
   const role = MOCK_ROLES[parts[1]];

@@ -31,6 +31,15 @@ Notes:
 - `imc-ingest` is temporarily merged into `realtime` for MVP; split when dedicated ingest lands.
 - Alarms hydrate from Postgres on realtime restart. History 6h/24h and KPI come from Timescale via `imc-api`.
 - Auth uses HS256 JWT (`JWT_SECRET`). Nest migration remains deferred.
+- **Production / showcase hardening (MVP):**
+  - API and realtime refuse the default `JWT_SECRET` unless `IMC_ALLOW_DEFAULT_JWT=true` (lab Compose only).
+  - Mock login tokens (`mock.{role}.{ts}`) are disabled when `NODE_ENV=production` unless `IMC_ALLOW_MOCK_AUTH=true`.
+  - Web production builds do not fall back to mock login unless `VITE_ALLOW_MOCK_AUTH=true`.
+  - Demo accounts in the README are lab seeds only.
+
+## Showcase demo
+
+Step-by-step talk track and acceptance minimum: [demo.md](./demo.md).
 
 ## Target (Year 1)
 

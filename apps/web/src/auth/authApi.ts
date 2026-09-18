@@ -72,9 +72,19 @@ export async function login(
     if (err instanceof Error && err.message === "Invalid username or password") {
       throw err;
     }
-    console.warn("[auth] API unreachable, using mock login", err);
+    console.warn("[auth] API unreachable", err);
   }
 
+  // Production builds must talk to imc-api. Mock tokens are lab-only.
+  const allowMock =
+    !import.meta.env.PROD || import.meta.env.VITE_ALLOW_MOCK_AUTH === "true";
+  if (!allowMock) {
+    throw new Error(
+      "API unreachable. Mock login is disabled in production builds.",
+    );
+  }
+
+  console.warn("[auth] falling back to mock login (dev / lab only)");
   return mockLogin(username, password);
 }
 

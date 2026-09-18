@@ -5,6 +5,8 @@ Single-workshop industrial monitoring digital twin:
 
 Public MVP showcase: a runnable pipeline (not a fake frontend animation) with live telemetry, alarm closed loop, history/KPI, and a 3D workshop twin.
 
+**Start here for demos:** [docs/demo.md](docs/demo.md) (60–90s talk track) · [docs/architecture.md](docs/architecture.md)
+
 ## Language policy
 
 - **Canonical language for this repository: English**
@@ -24,9 +26,34 @@ imc-simulator ──MQTT──► (embedded Aedes / Mosquitto) ──MQTT──�
 - Node.js ≥ 20
 - Docker (optional for local `dev:live`; required for `docker:mvp`)
 
-## 2. Quick start (recommended)
+## 2. Quick start (recommended showcase paths)
 
-### A. Local (Node)
+### A. Docker MVP (product-style demo)
+
+```bash
+cp .env.example .env
+npm install
+npm run docker:mvp
+```
+
+Open: http://127.0.0.1:3000  
+Stack: Postgres + Timescale + Mosquitto + api + realtime + simulator + nginx web.
+
+Stop: `npm run docker:mvp:down`
+
+### B. Local alarm closed-loop demo
+
+```bash
+cp .env.example .env
+npm install
+npm run dev:live:spike
+```
+
+Open: http://127.0.0.1:3000  
+Spike simulator cycles hot/cool so you can show **ACTIVE → ACKED → CLEARED** quickly.  
+Vite proxies `/ws` → realtime `:3002`.
+
+### C. Local (Node, steady drift)
 
 ```bash
 cp .env.example .env
@@ -34,10 +61,7 @@ npm install
 npm run dev:live
 ```
 
-Open: http://127.0.0.1:3000  
-Vite proxies `/ws` → realtime `:3002`.
-
-### B. Local with Postgres
+### D. Local with Postgres
 
 ```bash
 cp .env.example .env
@@ -47,31 +71,31 @@ npm run db:migrate
 npm run dev:live:db        # api + realtime + simulator + web
 ```
 
-### C. Docker MVP
-
-```bash
-cp .env.example .env
-npm run docker:mvp
-```
-
-Open: http://127.0.0.1:3000  
-Stack: Postgres + Timescale + Mosquitto + api + realtime + simulator + nginx web.
-
-Stop: `npm run docker:mvp:down`
-
 You should see:
 
-1. Login page → use mock accounts below
+1. Login page → use **demo accounts** below (lab only)
 2. Live panel with **WS open** / **MQTT live**
 3. **Eight** workshop assets updating about once per second (`SIM_FLEET=all`)
 
-### Mock accounts
+### Demo accounts (lab / local only)
 
 | User | Password | Role |
 |---|---|---|
 | `observer` | `observer123` | observer |
 | `admin` | `admin123` | admin |
 | `operator` | `operator123` | operator |
+
+> **Not for production.** Change `JWT_SECRET`, set `IMC_ALLOW_DEFAULT_JWT=false` on any exposed host.  
+> Production builds disable mock login fallback; Compose lab may still allow the default JWT via `IMC_ALLOW_DEFAULT_JWT=true`.
+
+### Screenshots
+
+| Preview | |
+|---|---|
+| Twin overview (design target) | ![Twin overview](docs/ui-designs/dcim-ui-01-twin-overview.png) |
+| Wallboard (design target) | ![Wallboard](docs/ui-designs/dcim-ui-03-wallboard.png) |
+
+Live product captures: add files under [`docs/screenshots/`](docs/screenshots/) (see that folder’s README), then link them here.
 
 ### Acceptance checklist
 
@@ -148,6 +172,8 @@ npm run dev:live:hot
 npm run dev:live:power
 ```
 
+Full talk track: [docs/demo.md](docs/demo.md).
+
 1. Open http://127.0.0.1:3000/login → `operator` / `operator123`
 2. Wait until Live shows an ACTIVE badge (or open `/alarms`)
 3. Confirm row: rule `TEMP_HIGH`, state `ACTIVE`, value > 80
@@ -197,7 +223,7 @@ apps/api            Fastify REST (auth, assets, alarms, WO, history, KPI, energy
 apps/ingest         Dedicated ingest (placeholder; MVP uses realtime)
 packages/shared-types   Protocol types
 deploy/             Docker Compose skeleton
-docs/               Project docs (architecture, protocol, runbook, UI designs)
+docs/               Project docs (architecture, protocol, runbook, demo, UI designs)
 ```
 
 ## 5. Protocol
@@ -206,9 +232,11 @@ See [docs/protocol.md](docs/protocol.md) and `packages/shared-types/src/index.ts
 
 ## 6. Documentation index
 
-1. [docs/business-logic.md](docs/business-logic.md) — business flows (start here)
-2. [docs/architecture.md](docs/architecture.md) · [docs/protocol.md](docs/protocol.md) · [docs/runbook.md](docs/runbook.md)
-3. [docs/ui-designs/](docs/ui-designs/) — IMC UI mockups
+1. [docs/demo.md](docs/demo.md) — showcase talk track (start here for demos)
+2. [docs/business-logic.md](docs/business-logic.md) — business flows
+3. [docs/architecture.md](docs/architecture.md) · [docs/protocol.md](docs/protocol.md) · [docs/runbook.md](docs/runbook.md)
+4. [docs/ui-designs/](docs/ui-designs/) — IMC UI mockups
+5. [docs/screenshots/](docs/screenshots/) — live product captures (add your PNGs)
 
 ## 7. Year 1 freezes
 

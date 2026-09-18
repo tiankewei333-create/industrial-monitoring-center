@@ -108,6 +108,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-imc}:${POSTGRES_PASSWORD:-imc_dev_password}@postgres:5432/${POSTGRES_DB:-imc}
       TIMESCALE_URL: postgres://${POSTGRES_USER:-imc}:${POSTGRES_PASSWORD:-imc_dev_password}@timescale:5432/imc_ts
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      IMC_ALLOW_DEFAULT_JWT: ${IMC_ALLOW_DEFAULT_JWT:-true}
       MQTT_USER: ${MQTT_USER:-imc}
       MQTT_PASSWORD: ${MQTT_PASSWORD:-imc_mqtt_password}
       MQTT_USERNAME: ${MQTT_USER:-imc}

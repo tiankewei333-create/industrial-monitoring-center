@@ -137,7 +137,7 @@ Anonymous `mosquitto_sub` against Compose MQTT should fail.
 - `GET http://localhost:3002/metrics` (Prometheus text)
 - Docker web: `GET http://127.0.0.1:3000/realtime-metrics`
 
-Login is rate-limited (20 attempts / IP / minute → HTTP 429). Production API refuses the default `JWT_SECRET` unless `IMC_ALLOW_DEFAULT_JWT=true` (lab only).
+Login is rate-limited (20 attempts / IP / minute → HTTP 429). Production API and realtime refuse the default `JWT_SECRET` unless `IMC_ALLOW_DEFAULT_JWT=true` (lab only). Production web builds disable mock login unless `VITE_ALLOW_MOCK_AUTH=true`. See [demo.md](./demo.md) for the showcase talk track.
 
 ## Plant hardening (unattended line — not in this repo)
 

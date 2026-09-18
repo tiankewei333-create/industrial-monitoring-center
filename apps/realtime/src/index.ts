@@ -30,6 +30,7 @@ import {
   writeAudit,
   dbEnabled,
 } from "./db.js";
+import { assertJwtSecret } from "./hardening.js";
 import { verifyAccessToken } from "./jwt.js";
 import {
   appendHistory,
@@ -374,6 +375,8 @@ function startHttpAndWs() {
 }
 
 async function main() {
+  assertJwtSecret();
+
   try {
     await initDb();
     if (dbEnabled()) {

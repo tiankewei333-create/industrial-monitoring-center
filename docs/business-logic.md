@@ -60,7 +60,7 @@ flowchart TB
 | MQTT transport | Done | Common industrial ingress |
 | Backend bridge to UI | Done | Browser does not talk to the broker |
 | Live temp / speed / power | Done | “Is the machine moving?” |
-| Login / roles | Postgres + JWT (mock fallback) | Who can view / operate |
+| Login / roles | Postgres + JWT (mock fallback in **dev only**) | Who can view / operate |
 | Alarm closed loop | TEMP_HIGH / POWER_HIGH / OFFLINE + Postgres | Raise / ack / clear; hydrate on restart |
 | History curves | Memory + Timescale | Live ~15 min; API 1h/6h/24h downsampled; 30d retention |
 | 3D twin | R3F + glTF + heat shader | Pick + status lamps + temp ramp 40→90°C |
